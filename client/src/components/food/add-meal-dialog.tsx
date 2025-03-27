@@ -84,10 +84,17 @@ export default function AddMealDialog({ open, onOpenChange, userId, date }: AddM
     enabled: open,
   });
   
-  // Filter food items based on search term
-  const filteredFoodItems = foodItems.filter(item => 
-    item.name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // State for FDA API search results and loading state
+  const [fdaSearchResults, setFdaSearchResults] = useState<FoodItem[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  
+  // Combined local and FDA search results
+  const filteredFoodItems = [
+    ...foodItems.filter(item => 
+      item.name.toLowerCase().includes(searchTerm.toLowerCase())
+    ),
+    ...fdaSearchResults
+  ];
   
   // Form setup
   const form = useForm<MealFormValues>({
@@ -176,23 +183,77 @@ export default function AddMealDialog({ open, onOpenChange, userId, date }: AddM
     setSearchTerm("");
   };
   
+  // Handle FDA API food search
+  const handleFdaSearch = async (query: string) => {
+    if (query.trim().length < 3) {
+      setFdaSearchResults([]);
+      return;
+    }
+    
+    try {
+      setIsSearching(true);
+      
+      // Use FDA API to search for food
+      const fdaApi = getFdaApi();
+      if (!fdaApi) {
+        // FDA API not configured - just use local results
+        setIsSearching(false);
+        return;
+      }
+      
+      // Search FDA database
+      const result = await fdaApi.searchFoodByName(query);
+      
+      if (result && result.foods) {
+        // Transform FDA results to FoodItem format
+        const fdaItems: FoodItem[] = result.foods.map((food: any) => {
+          // Extract nutrition data if available
+          const nutritionData = food.foodNutrients?.reduce((acc: any, item: any) => {
+            if (item.nutrientName === "Energy" && item.unitName === "KCAL") {
+              acc.calories = Math.round(item.value);
+            } else if (item.nutrientName === "Protein") {
+              acc.protein = Math.round(item.value);
+            } else if (item.nutrientName === "Total lipid (fat)") {
+              acc.fat = Math.round(item.value);
+            } else if (item.nutrientName === "Carbohydrate, by difference") {
+              acc.carbs = Math.round(item.value);
+            } else if (item.nutrientName === "Sugars, total including NLEA") {
+              acc.sugar = Math.round(item.value);
+            }
+            return acc;
+          }, { calories: 0, protein: 0, fat: 0, carbs: 0, sugar: 0 });
+          
+          return {
+            id: food.fdcId || Date.now() + Math.random(),
+            name: food.description || food.brandName || "Food Item",
+            calories: nutritionData.calories || 0,
+            protein: nutritionData.protein || 0,
+            carbs: nutritionData.carbs || 0,
+            fat: nutritionData.fat || 0,
+            sugar: nutritionData.sugar || 0,
+            ingredientQuality: 4
+          };
+        });
+        
+        setFdaSearchResults(fdaItems);
+      } else {
+        setFdaSearchResults([]);
+      }
+    } catch (error) {
+      console.error("Error searching FDA database:", error);
+      setFdaSearchResults([]);
+    } finally {
+      setIsSearching(false);
+    }
+  };
+  
   // Handle barcode scan results
   const handleBarcodeScan = async (barcodeData: string) => {
     try {
       setIsProcessingBarcode(true);
       
-      // Check if FDA API is configured
+      // Get FDA API service
       const fdaApi = getFdaApi();
-      if (!fdaApi) {
-        toast({
-          title: "FDA API Key Required",
-          description: "Please add your FDA API key in Settings to use barcode scanning.",
-          variant: "destructive",
-        });
-        setShowScanner(false);
-        setIsProcessingBarcode(false);
-        return;
-      }
       
       // Search for food by UPC barcode
       const result = await fdaApi.searchByUpc(barcodeData);
@@ -404,14 +465,22 @@ export default function AddMealDialog({ open, onOpenChange, userId, date }: AddM
                     placeholder="Search food items..."
                     className="pl-9"
                     value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
+                    onChange={(e) => {
+                      setSearchTerm(e.target.value);
+                      handleFdaSearch(e.target.value);
+                    }}
                   />
                 </div>
                 
                 {searchTerm && (
                   <Card className="max-h-[200px] overflow-y-auto">
                     <CardContent className="p-2 space-y-1">
-                      {filteredFoodItems.length > 0 ? (
+                      {isSearching ? (
+                        <div className="flex justify-center items-center py-4">
+                          <Loader2 className="h-6 w-6 animate-spin text-primary mr-2" />
+                          <span className="text-sm">Searching FDA database...</span>
+                        </div>
+                      ) : filteredFoodItems.length > 0 ? (
                         filteredFoodItems.map((item) => (
                           <div 
                             key={item.id} 
@@ -472,7 +541,7 @@ export default function AddMealDialog({ open, onOpenChange, userId, date }: AddM
                   </div>
                 )}
                 <div className="text-xs text-muted-foreground text-center">
-                  Barcode scanning requires an FDA API key configured in Settings.
+                  Barcode scanning uses the FDA database to retrieve nutritional information.
                 </div>
               </TabsContent>
             </Tabs>

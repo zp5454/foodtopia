@@ -290,10 +290,90 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Config routes
-  app.get("/api/config/fda-api-key", (req, res) => {
-    const apiKey = process.env.FDA_API_KEY || "";
-    res.status(200).json({ apiKey });
+  // FDA API routes
+  app.get("/api/fda/search", async (req, res) => {
+    try {
+      const query = req.query.q as string;
+      const pageSize = parseInt(req.query.pageSize as string) || 10;
+      const apiKey = process.env.FDA_API_KEY;
+      
+      if (!query) {
+        return res.status(400).json({ message: "Search query is required" });
+      }
+      
+      if (!apiKey) {
+        return res.status(500).json({ message: "FDA API key is not configured" });
+      }
+      
+      const url = `https://api.nal.usda.gov/fdc/v1/foods/search?api_key=${apiKey}&query=${encodeURIComponent(query)}&pageSize=${pageSize}`;
+      
+      const response = await fetch(url);
+      const data = await response.json();
+      
+      res.json(data);
+    } catch (error) {
+      handleError(res, error);
+    }
+  });
+  
+  app.get("/api/fda/barcode/:upc", async (req, res) => {
+    try {
+      const upc = req.params.upc;
+      const apiKey = process.env.FDA_API_KEY;
+      
+      if (!upc) {
+        return res.status(400).json({ message: "UPC barcode is required" });
+      }
+      
+      if (!apiKey) {
+        return res.status(500).json({ message: "FDA API key is not configured" });
+      }
+      
+      const url = `https://api.nal.usda.gov/fdc/v1/foods/search?api_key=${apiKey}&query=${upc}`;
+      
+      const response = await fetch(url);
+      const data = await response.json();
+      
+      // Filter out results that don't match the UPC exactly
+      const exactMatches = data.foods?.filter((food: any) => 
+        food.gtinUpc === upc || 
+        food.fdcId === upc || 
+        (food.foodCode && food.foodCode === upc)
+      );
+      
+      if (exactMatches && exactMatches.length > 0) {
+        res.json({ foods: exactMatches });
+      } else {
+        // If no exact matches, return all results
+        res.json(data);
+      }
+    } catch (error) {
+      handleError(res, error);
+    }
+  });
+  
+  app.get("/api/fda/food/:fdcId", async (req, res) => {
+    try {
+      const fdcId = req.params.fdcId;
+      const apiKey = process.env.FDA_API_KEY;
+      
+      if (!fdcId) {
+        return res.status(400).json({ message: "Food ID is required" });
+      }
+      
+      if (!apiKey) {
+        return res.status(500).json({ message: "FDA API key is not configured" });
+      }
+      
+      const url = `https://api.nal.usda.gov/fdc/v1/food/${fdcId}?api_key=${apiKey}`;
+      
+      const response = await fetch(url);
+      const data = await response.json();
+      
+      res.json(data);
+    } catch (error) {
+      handleError(res, error);
+    }
   });
   
   // Suggestions routes

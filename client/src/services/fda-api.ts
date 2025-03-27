@@ -1,31 +1,19 @@
 import axios from 'axios';
 
-const FDA_API_BASE_URL = 'https://api.nal.usda.gov/fdc/v1';
-
-interface FdaApiConfig {
-  apiKey: string;
-}
-
 /**
  * FDA Food Data Central API Service
+ * This version uses server-side API calls to avoid exposing API keys to the client
  */
 export class FdaApiService {
-  private apiKey: string;
-
-  constructor(config: FdaApiConfig) {
-    this.apiKey = config.apiKey;
-  }
-
   /**
    * Search for food items by name
    */
-  async searchFoodByName(query: string, pageSize = 10): Promise<any> {
+  async searchFoodByName(query: string, pageSize = 20): Promise<any> {
     try {
-      const response = await axios.get(`${FDA_API_BASE_URL}/foods/search`, {
+      const response = await axios.get(`/api/fda/search`, {
         params: {
-          query,
-          pageSize,
-          api_key: this.apiKey
+          q: query,
+          pageSize
         }
       });
       return response.data;
@@ -40,11 +28,7 @@ export class FdaApiService {
    */
   async getFoodDetails(fdcId: string): Promise<any> {
     try {
-      const response = await axios.get(`${FDA_API_BASE_URL}/food/${fdcId}`, {
-        params: {
-          api_key: this.apiKey
-        }
-      });
+      const response = await axios.get(`/api/fda/food/${fdcId}`);
       return response.data;
     } catch (error) {
       console.error('Error getting food details from FDA database:', error);
@@ -57,15 +41,7 @@ export class FdaApiService {
    */
   async searchByUpc(upc: string): Promise<any> {
     try {
-      // FDA API uses 'gtinUpc' as a search parameter for UPC/barcode
-      const response = await axios.get(`${FDA_API_BASE_URL}/foods/search`, {
-        params: {
-          query: upc,
-          dataType: 'Branded',
-          pageSize: 1,
-          api_key: this.apiKey
-        }
-      });
+      const response = await axios.get(`/api/fda/barcode/${upc}`);
       return response.data;
     } catch (error) {
       console.error('Error searching FDA database by UPC:', error);
@@ -145,45 +121,13 @@ export class FdaApiService {
   }
 }
 
-// Initialize with FDA API key
-// The key will be obtained from environment variables or user input
+// Single instance of the service
 let fdaApiService: FdaApiService | null = null;
 
-export const initFdaApi = (apiKey: string): FdaApiService => {
-  fdaApiService = new FdaApiService({ apiKey });
-  return fdaApiService;
-};
-
-export const getFdaApi = async (): Promise<FdaApiService> => {
+// Simple initialization - no need for API key as it's handled server-side
+export const getFdaApi = (): FdaApiService => {
   if (!fdaApiService) {
-    try {
-      // Try to get API key from localStorage first
-      const localStorageKey = typeof window !== 'undefined' ? localStorage.getItem('fda_api_key') : null;
-      
-      if (localStorageKey) {
-        fdaApiService = new FdaApiService({ apiKey: localStorageKey });
-        return fdaApiService;
-      }
-      
-      // If not in localStorage, try to get from server environment
-      const response = await fetch('/api/config/fda-api-key');
-      const data = await response.json();
-      
-      if (data.apiKey) {
-        fdaApiService = new FdaApiService({ apiKey: data.apiKey });
-        // Save to localStorage for future use
-        if (typeof window !== 'undefined') {
-          localStorage.setItem('fda_api_key', data.apiKey);
-        }
-        return fdaApiService;
-      }
-      
-      throw new Error('FDA API service not initialized. Call initFdaApi first or set up API key in settings.');
-    } catch (error) {
-      console.error('Error initializing FDA API service:', error);
-      throw new Error('FDA API service not initialized. Call initFdaApi first or set up API key in settings.');
-    }
+    fdaApiService = new FdaApiService();
   }
-  
   return fdaApiService;
 };
