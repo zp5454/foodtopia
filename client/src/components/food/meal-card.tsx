@@ -53,9 +53,16 @@ export default function MealCard({ meal }: MealCardProps) {
     onSuccess: () => {
       // Get the date from the meal to use in the query key
       const date = new Date(meal.date);
+      // Format date as YYYY-MM-DD for query key
+      const formattedDate = date.toISOString().split('T')[0];
+      
       // Invalidate both the meals list and the daily progress
-      queryClient.invalidateQueries({ queryKey: [`/api/meals?userId=${meal.userId}&date=${date.toISOString()}`] });
-      queryClient.invalidateQueries({ queryKey: [`/api/daily-progress?userId=${meal.userId}&date=${date.toISOString()}`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/meals?userId=${meal.userId}&date=${formattedDate}`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/daily-progress?userId=${meal.userId}&date=${formattedDate}`] });
+      
+      // Also invalidate with the original format to be sure
+      queryClient.invalidateQueries({ queryKey: [`/api/meals`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/daily-progress`] });
       
       toast({
         title: "Meal deleted",

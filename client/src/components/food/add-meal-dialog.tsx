@@ -78,23 +78,12 @@ export default function AddMealDialog({ open, onOpenChange, userId, date }: AddM
   const [isProcessingBarcode, setIsProcessingBarcode] = useState(false);
   const { toast } = useToast();
   
-  // Fetch food items for dropdown
-  const { data: foodItems = [] } = useQuery<FoodItem[]>({
-    queryKey: ["/api/food-items"],
-    enabled: open,
-  });
-  
   // State for FDA API search results and loading state
   const [fdaSearchResults, setFdaSearchResults] = useState<FoodItem[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   
-  // Combined local and FDA search results
-  const filteredFoodItems = [
-    ...foodItems.filter(item => 
-      item.name.toLowerCase().includes(searchTerm.toLowerCase())
-    ),
-    ...fdaSearchResults
-  ];
+  // Using only FDA search results
+  const filteredFoodItems = fdaSearchResults;
   
   // Form setup
   const form = useForm<MealFormValues>({

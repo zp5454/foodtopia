@@ -207,25 +207,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Food items routes
-  app.get("/api/food-items", async (req, res) => {
-    try {
-      const foodItems = await storage.getFoodItems();
-      res.json(foodItems);
-    } catch (error) {
-      handleError(res, error);
-    }
-  });
-
-  app.post("/api/food-items", async (req, res) => {
-    try {
-      const foodItemData = insertFoodItemSchema.parse(req.body);
-      const foodItem = await storage.createFoodItem(foodItemData);
-      res.status(201).json(foodItem);
-    } catch (error) {
-      handleError(res, error);
-    }
-  });
+  // Food items routes removed - using FDA API only
 
   // Exercises routes
   app.get("/api/exercises", async (req, res) => {
@@ -329,10 +311,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(500).json({ message: "FDA API key is not configured" });
       }
       
-      const url = `https://api.nal.usda.gov/fdc/v1/foods/search?api_key=${apiKey}&query=${upc}`;
+      // First try searching with gtinUpc parameter which is more accurate for barcodes
+      let url = `https://api.nal.usda.gov/fdc/v1/foods/search?api_key=${apiKey}&query=&pageSize=25&gtinUpc=${upc}`;
       
-      const response = await fetch(url);
-      const data = await response.json();
+      let response = await fetch(url);
+      let data = await response.json();
+      
+      // If no results using gtinUpc, try regular search
+      if (!data.foods || data.foods.length === 0) {
+        url = `https://api.nal.usda.gov/fdc/v1/foods/search?api_key=${apiKey}&query=${upc}`;
+        response = await fetch(url);
+        data = await response.json();
+      }
       
       // Filter out results that don't match the UPC exactly
       const exactMatches = data.foods?.filter((food: any) => 
