@@ -36,25 +36,22 @@ export default function Progress() {
   // Create a map to store daily progress data by date
   const [progressData, setProgressData] = useState<Map<string, DailyProgress>>(new Map());
   
-  // Fetch each day's progress
-  last7Days.forEach(date => {
-    const { data } = useQuery<DailyProgress>({
-      queryKey: [
-        `/api/daily-progress?userId=${userId}&date=${date.toISOString()}`
-      ],
-    });
-    
-    useEffect(() => {
-      if (data) {
-        setProgressData(prev => {
-          const newMap = new Map(prev);
-          const dateKey = format(date, "yyyy-MM-dd");
-          newMap.set(dateKey, data);
-          return newMap;
-        });
-      }
-    }, [data]);
+  // Fetch daily progress for the selected date
+  const { data: currentDayProgress } = useQuery<DailyProgress>({
+    queryKey: [`/api/daily-progress?userId=${userId}&date=${new Date().toISOString()}`],
   });
+  
+  // Use a single effect to update the progress data 
+  useEffect(() => {
+    if (currentDayProgress) {
+      setProgressData(prev => {
+        const newMap = new Map(prev);
+        const dateKey = format(new Date(), "yyyy-MM-dd");
+        newMap.set(dateKey, currentDayProgress);
+        return newMap;
+      });
+    }
+  }, [currentDayProgress]);
   
   // Prepare data for charts
   const caloriesChartData = last7Days.map(date => {
