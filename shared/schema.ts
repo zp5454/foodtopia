@@ -155,11 +155,13 @@ export const foodSuggestions = pgTable("food_suggestions", {
   description: text("description").notNull(),
   calories: integer("calories").notNull(),
   protein: real("protein").notNull(),
-  carbs: real("carbs").notNull(),
-  fat: real("fat").notNull(),
-  ingredientQuality: integer("ingredient_quality").notNull(),
+  carbs: real("carbs").default(0),
+  fat: real("fat").default(0),
+  sugar: real("sugar").default(0),
+  ingredientQuality: integer("ingredient_quality").default(5),
   mealType: text("meal_type").notNull(), // breakfast, lunch, dinner, snack
-  image: text("image").notNull(), // URL to image
+  image: text("image"), // URL to image
+  ingredients: text("ingredients").notNull(), // List of ingredients
 });
 
 export const insertFoodSuggestionSchema = createInsertSchema(foodSuggestions).pick({
@@ -169,20 +171,23 @@ export const insertFoodSuggestionSchema = createInsertSchema(foodSuggestions).pi
   protein: true,
   carbs: true,
   fat: true,
+  sugar: true,
   ingredientQuality: true,
   mealType: true,
   image: true,
+  ingredients: true,
 });
 
 export const workoutSuggestions = pgTable("workout_suggestions", {
   id: serial("id").primaryKey(),
   title: text("title").notNull(),
   description: text("description").notNull(),
-  durationMinutes: integer("duration_minutes").notNull(),
+  durationMinutes: integer("duration_minutes").default(30),
   intensity: text("intensity").notNull(),
-  type: text("type").notNull(),
-  caloriesBurned: integer("calories_burned").notNull(),
-  instructions: text("instructions").notNull(),
+  type: text("type").default("Workout"),
+  caloriesBurned: integer("calories_burned").default(200),
+  instructions: text("instructions"),
+  exercises: text("exercises").notNull(),
 });
 
 export const insertWorkoutSuggestionSchema = createInsertSchema(workoutSuggestions).pick({
@@ -193,6 +198,7 @@ export const insertWorkoutSuggestionSchema = createInsertSchema(workoutSuggestio
   type: true,
   caloriesBurned: true,
   instructions: true,
+  exercises: true,
 });
 
 // Type definitions

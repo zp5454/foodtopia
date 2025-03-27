@@ -8,6 +8,9 @@ import {
   foodSuggestions, type FoodSuggestion, type InsertFoodSuggestion,
   workoutSuggestions, type WorkoutSuggestion, type InsertWorkoutSuggestion
 } from "@shared/schema";
+import { db } from "./db";
+import { eq, and, gte, lte } from "drizzle-orm";
+import * as schema from "@shared/schema";
 
 // Define storage interface
 export interface IStorage {
@@ -564,4 +567,804 @@ export class MemStorage implements IStorage {
   }
 }
 
-export const storage = new MemStorage();
+// Create a DatabaseStorage class that implements IStorage
+export class DatabaseStorage implements IStorage {
+  // User methods
+  async getUser(id: number): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.id, id));
+    return user || undefined;
+  }
+
+  async getUserByUsername(username: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.username, username));
+    return user || undefined;
+  }
+
+  async createUser(insertUser: InsertUser): Promise<User> {
+    const [user] = await db.insert(users).values(insertUser).returning();
+    return user;
+  }
+  
+  // Food items methods
+  async getFoodItems(): Promise<FoodItem[]> {
+    return await db.select().from(foodItems);
+  }
+  
+  async getFoodItem(id: number): Promise<FoodItem | undefined> {
+    const [item] = await db.select().from(foodItems).where(eq(foodItems.id, id));
+    return item || undefined;
+  }
+  
+  async createFoodItem(foodItem: InsertFoodItem): Promise<FoodItem> {
+    const [item] = await db.insert(foodItems).values(foodItem).returning();
+    return item;
+  }
+  
+  // Meal methods
+  async getMeals(userId: number): Promise<Meal[]> {
+    return await db.select().from(meals).where(eq(meals.userId, userId));
+  }
+  
+  async getMealsByDate(userId: number, date: Date): Promise<Meal[]> {
+    const startOfDay = new Date(date);
+    startOfDay.setHours(0, 0, 0, 0);
+    
+    const endOfDay = new Date(date);
+    endOfDay.setHours(23, 59, 59, 999);
+    
+    return await db
+      .select()
+      .from(meals)
+      .where(
+        and(
+          eq(meals.userId, userId),
+          gte(meals.date, startOfDay),
+          lte(meals.date, endOfDay)
+        )
+      );
+  }
+  
+  async getMeal(id: number): Promise<Meal | undefined> {
+    const [meal] = await db.select().from(meals).where(eq(meals.id, id));
+    return meal || undefined;
+  }
+  
+  async createMeal(meal: InsertMeal): Promise<Meal> {
+    const [newMeal] = await db.insert(meals).values({
+      ...meal,
+      date: meal.date || new Date(),
+      qualityNotes: meal.qualityNotes ?? null
+    }).returning();
+    
+    // Update daily progress
+    await this.updateDailyProgressAfterMeal(newMeal);
+    return newMeal;
+  }
+  
+  async deleteMeal(id: number): Promise<boolean> {
+    const meal = await this.getMeal(id);
+    if (!meal) {
+      return false;
+    }
+    
+    await db.delete(meals).where(eq(meals.id, id));
+    
+    // Update daily progress
+    const startOfDay = new Date(meal.date);
+    startOfDay.setHours(0, 0, 0, 0);
+    
+    const endOfDay = new Date(meal.date);
+    endOfDay.setHours(23, 59, 59, 999);
+    
+    // Get all meals for the day
+    const dayMeals = await db
+      .select()
+      .from(meals)
+      .where(
+        and(
+          eq(meals.userId, meal.userId),
+          gte(meals.date, startOfDay),
+          lte(meals.date, endOfDay)
+        )
+      );
+    
+    // Calculate totals
+    let totalCalories = 0;
+    let totalProtein = 0;
+    let totalCarbs = 0;
+    let totalFat = 0;
+    let totalSugar = 0;
+    
+    for (const m of dayMeals) {
+      totalCalories += m.totalCalories;
+      totalProtein += m.totalProtein;
+      // Parse items to get carbs, fat, sugar
+      const items = m.items as any[];
+      for (const item of items) {
+        totalCarbs += item.carbs || 0;
+        totalFat += item.fat || 0;
+        totalSugar += item.sugar || 0;
+      }
+    }
+    
+    // Update or create progress
+    const progress = await this.getDailyProgress(meal.userId, meal.date);
+    if (progress) {
+      await db
+        .update(dailyProgress)
+        .set({
+          caloriesConsumed: totalCalories,
+          proteinConsumed: totalProtein,
+          carbsConsumed: totalCarbs,
+          fatConsumed: totalFat,
+          sugarConsumed: totalSugar
+        })
+        .where(eq(dailyProgress.id, progress.id));
+    }
+    
+    return true;
+  }
+  
+  // Exercise methods
+  async getExercises(): Promise<Exercise[]> {
+    return await db.select().from(exercises);
+  }
+  
+  async getExercise(id: number): Promise<Exercise | undefined> {
+    const [exercise] = await db.select().from(exercises).where(eq(exercises.id, id));
+    return exercise || undefined;
+  }
+  
+  async createExercise(exercise: InsertExercise): Promise<Exercise> {
+    const [newExercise] = await db.insert(exercises).values({
+      ...exercise,
+      instructions: exercise.instructions ?? null
+    }).returning();
+    return newExercise;
+  }
+  
+  // Workout methods
+  async getWorkouts(userId: number): Promise<Workout[]> {
+    return await db.select().from(workouts).where(eq(workouts.userId, userId));
+  }
+  
+  async getWorkoutsByDate(userId: number, date: Date): Promise<Workout[]> {
+    const startOfDay = new Date(date);
+    startOfDay.setHours(0, 0, 0, 0);
+    
+    const endOfDay = new Date(date);
+    endOfDay.setHours(23, 59, 59, 999);
+    
+    return await db
+      .select()
+      .from(workouts)
+      .where(
+        and(
+          eq(workouts.userId, userId),
+          gte(workouts.date, startOfDay),
+          lte(workouts.date, endOfDay)
+        )
+      );
+  }
+  
+  async getWorkout(id: number): Promise<Workout | undefined> {
+    const [workout] = await db.select().from(workouts).where(eq(workouts.id, id));
+    return workout || undefined;
+  }
+  
+  async createWorkout(workout: InsertWorkout): Promise<Workout> {
+    const [newWorkout] = await db.insert(workouts).values({
+      ...workout,
+      date: workout.date || new Date()
+    }).returning();
+    
+    // Update daily progress
+    await this.updateDailyProgressAfterWorkout(newWorkout);
+    return newWorkout;
+  }
+  
+  async deleteWorkout(id: number): Promise<boolean> {
+    const workout = await this.getWorkout(id);
+    if (!workout) {
+      return false;
+    }
+    
+    await db.delete(workouts).where(eq(workouts.id, id));
+    
+    // Update daily progress
+    const startOfDay = new Date(workout.date);
+    startOfDay.setHours(0, 0, 0, 0);
+    
+    const endOfDay = new Date(workout.date);
+    endOfDay.setHours(23, 59, 59, 999);
+    
+    // Get all workouts for the day
+    const dayWorkouts = await db
+      .select()
+      .from(workouts)
+      .where(
+        and(
+          eq(workouts.userId, workout.userId),
+          gte(workouts.date, startOfDay),
+          lte(workouts.date, endOfDay)
+        )
+      );
+    
+    // Calculate totals
+    let totalMinutes = 0;
+    let totalCaloriesBurned = 0;
+    
+    for (const w of dayWorkouts) {
+      totalMinutes += w.durationMinutes;
+      totalCaloriesBurned += w.caloriesBurned;
+    }
+    
+    // Update or create progress
+    const progress = await this.getDailyProgress(workout.userId, workout.date);
+    if (progress) {
+      await db
+        .update(dailyProgress)
+        .set({
+          workoutMinutes: totalMinutes,
+          caloriesBurned: totalCaloriesBurned
+        })
+        .where(eq(dailyProgress.id, progress.id));
+    }
+    
+    return true;
+  }
+  
+  // Progress methods
+  async getDailyProgress(userId: number, date: Date): Promise<DailyProgress | undefined> {
+    const startOfDay = new Date(date);
+    startOfDay.setHours(0, 0, 0, 0);
+    
+    const endOfDay = new Date(date);
+    endOfDay.setHours(23, 59, 59, 999);
+    
+    const [progress] = await db
+      .select()
+      .from(dailyProgress)
+      .where(
+        and(
+          eq(dailyProgress.userId, userId),
+          gte(dailyProgress.date, startOfDay),
+          lte(dailyProgress.date, endOfDay)
+        )
+      );
+    
+    return progress || undefined;
+  }
+  
+  async createOrUpdateDailyProgress(progress: InsertDailyProgress): Promise<DailyProgress> {
+    // Ensure date is not undefined
+    if (!progress.date) {
+      progress.date = new Date();
+    }
+    
+    const existing = await this.getDailyProgress(progress.userId, progress.date);
+    
+    if (existing) {
+      // Update existing
+      const [updated] = await db
+        .update(dailyProgress)
+        .set(progress)
+        .where(eq(dailyProgress.id, existing.id))
+        .returning();
+      
+      return updated;
+    } else {
+      // Create new
+      const [newProgress] = await db
+        .insert(dailyProgress)
+        .values({
+          ...progress,
+          caloriesConsumed: progress.caloriesConsumed ?? 0,
+          proteinConsumed: progress.proteinConsumed ?? 0,
+          carbsConsumed: progress.carbsConsumed ?? 0,
+          fatConsumed: progress.fatConsumed ?? 0,
+          sugarConsumed: progress.sugarConsumed ?? 0,
+          workoutMinutes: progress.workoutMinutes ?? 0,
+          caloriesBurned: progress.caloriesBurned ?? 0
+        })
+        .returning();
+      
+      return newProgress;
+    }
+  }
+  
+  // Suggestions methods
+  async getFoodSuggestions(): Promise<FoodSuggestion[]> {
+    return await db.select().from(foodSuggestions);
+  }
+  
+  async getWorkoutSuggestions(): Promise<WorkoutSuggestion[]> {
+    return await db.select().from(workoutSuggestions);
+  }
+  
+  async createFoodSuggestion(suggestion: InsertFoodSuggestion): Promise<FoodSuggestion> {
+    const [newSuggestion] = await db.insert(foodSuggestions).values({
+      ...suggestion,
+      image: suggestion.image ?? null
+    }).returning();
+    return newSuggestion;
+  }
+  
+  async createWorkoutSuggestion(suggestion: InsertWorkoutSuggestion): Promise<WorkoutSuggestion> {
+    const [newSuggestion] = await db.insert(workoutSuggestions).values({
+      ...suggestion,
+      type: suggestion.type ?? 'Workout',
+      instructions: suggestion.instructions ?? null
+    }).returning();
+    return newSuggestion;
+  }
+  
+  // Helper methods
+  private async updateDailyProgressAfterMeal(meal: Meal): Promise<void> {
+    const progress = await this.getDailyProgress(meal.userId, meal.date);
+    
+    if (progress) {
+      // Get all meals for today
+      const meals = await this.getMealsByDate(meal.userId, meal.date);
+      
+      // Calculate total nutrients
+      let totalCalories = 0;
+      let totalProtein = 0;
+      let totalCarbs = 0;
+      let totalFat = 0;
+      let totalSugar = 0;
+      
+      for (const m of meals) {
+        totalCalories += m.totalCalories;
+        totalProtein += m.totalProtein;
+        // Parse items to get carbs, fat, sugar
+        const items = m.items as any[];
+        for (const item of items) {
+          totalCarbs += item.carbs || 0;
+          totalFat += item.fat || 0;
+          totalSugar += item.sugar || 0;
+        }
+      }
+      
+      // Update progress
+      await db
+        .update(dailyProgress)
+        .set({
+          caloriesConsumed: totalCalories,
+          proteinConsumed: totalProtein,
+          carbsConsumed: totalCarbs,
+          fatConsumed: totalFat,
+          sugarConsumed: totalSugar
+        })
+        .where(eq(dailyProgress.id, progress.id));
+    } else {
+      // Create new progress entry
+      // Parse items to get carbs, fat, sugar
+      const items = meal.items as any[];
+      let totalCarbs = 0;
+      let totalFat = 0;
+      let totalSugar = 0;
+      
+      for (const item of items) {
+        totalCarbs += item.carbs || 0;
+        totalFat += item.fat || 0;
+        totalSugar += item.sugar || 0;
+      }
+      
+      await db.insert(dailyProgress).values({
+        userId: meal.userId,
+        date: meal.date,
+        caloriesConsumed: meal.totalCalories,
+        proteinConsumed: meal.totalProtein,
+        carbsConsumed: totalCarbs,
+        fatConsumed: totalFat,
+        sugarConsumed: totalSugar,
+        workoutMinutes: 0,
+        caloriesBurned: 0
+      });
+    }
+  }
+  
+  private async updateDailyProgressAfterWorkout(workout: Workout): Promise<void> {
+    const progress = await this.getDailyProgress(workout.userId, workout.date);
+    
+    if (progress) {
+      // Get all workouts for today
+      const workouts = await this.getWorkoutsByDate(workout.userId, workout.date);
+      
+      // Calculate total workout stats
+      let totalMinutes = 0;
+      let totalCaloriesBurned = 0;
+      
+      for (const w of workouts) {
+        totalMinutes += w.durationMinutes;
+        totalCaloriesBurned += w.caloriesBurned;
+      }
+      
+      // Update progress
+      await db
+        .update(dailyProgress)
+        .set({
+          workoutMinutes: totalMinutes,
+          caloriesBurned: totalCaloriesBurned
+        })
+        .where(eq(dailyProgress.id, progress.id));
+    } else {
+      // Create new progress entry
+      await db.insert(dailyProgress).values({
+        userId: workout.userId,
+        date: workout.date,
+        caloriesConsumed: 0,
+        proteinConsumed: 0,
+        carbsConsumed: 0,
+        fatConsumed: 0,
+        sugarConsumed: 0,
+        workoutMinutes: workout.durationMinutes,
+        caloriesBurned: workout.caloriesBurned
+      });
+    }
+  }
+}
+
+// Initialize the database with sample data
+export async function initDatabase() {
+  // Create a user if none exists
+  const users = await db.select().from(schema.users);
+  if (users.length === 0) {
+    await db.insert(schema.users).values({
+      username: "demo",
+      password: "password123",
+      calorieGoal: 2000,
+      proteinGoal: 120,
+      carbsGoal: 250,
+      fatGoal: 65,
+      sugarGoal: 50,
+      workoutGoal: 45
+    });
+  }
+  
+  // Add sample food items if none exist
+  const foodItemsList = await db.select().from(schema.foodItems);
+  if (foodItemsList.length === 0) {
+    const sampleFoodItems = [
+      {
+        name: "Banana",
+        calories: 105,
+        protein: 1.3,
+        carbs: 27,
+        fat: 0.4,
+        sugar: 14,
+        ingredientQuality: 9,
+        qualityNotes: "Whole fruit, high in potassium and natural sugars"
+      },
+      {
+        name: "Greek Yogurt",
+        calories: 130,
+        protein: 17,
+        carbs: 6,
+        fat: 4,
+        sugar: 4,
+        ingredientQuality: 8,
+        qualityNotes: "High protein dairy, probiotics for gut health"
+      },
+      {
+        name: "Grilled Chicken Breast",
+        calories: 165,
+        protein: 31,
+        carbs: 0,
+        fat: 3.6,
+        sugar: 0,
+        ingredientQuality: 7,
+        qualityNotes: "Lean protein source, low in fat"
+      },
+      {
+        name: "Avocado",
+        calories: 234,
+        protein: 2.9,
+        carbs: 12,
+        fat: 21,
+        sugar: 0.7,
+        ingredientQuality: 9,
+        qualityNotes: "Healthy fats, fiber, and vitamins"
+      }
+    ];
+    
+    for (const item of sampleFoodItems) {
+      await db.insert(schema.foodItems).values(item);
+    }
+  }
+  
+  // Add sample exercises if none exist
+  const exercisesList = await db.select().from(schema.exercises);
+  if (exercisesList.length === 0) {
+    const sampleExercises = [
+      {
+        name: "Running",
+        type: "Cardio",
+        caloriesPerMinute: 10,
+        intensity: "High",
+        durationMinutes: 30,
+        instructions: "Maintain a steady pace, focus on proper form"
+      },
+      {
+        name: "Cycling",
+        type: "Cardio",
+        caloriesPerMinute: 8,
+        intensity: "Medium",
+        durationMinutes: 45,
+        instructions: "Adjust resistance as needed, maintain cadence"
+      },
+      {
+        name: "Push-Ups",
+        type: "Strength",
+        caloriesPerMinute: 7,
+        intensity: "Medium",
+        durationMinutes: 10,
+        instructions: "Keep body straight, lower until elbows at 90 degrees"
+      },
+      {
+        name: "Squats",
+        type: "Strength",
+        caloriesPerMinute: 8,
+        intensity: "Medium",
+        durationMinutes: 15,
+        instructions: "Keep weight in heels, knees tracking over toes"
+      }
+    ];
+    
+    for (const exercise of sampleExercises) {
+      await db.insert(schema.exercises).values(exercise);
+    }
+  }
+  
+  // Add sample food suggestions if none exist
+  const foodSuggestionsList = await db.select().from(schema.foodSuggestions);
+  if (foodSuggestionsList.length === 0) {
+    const sampleFoodSuggestions = [
+      {
+        name: "Mediterranean Bowl",
+        description: "Quinoa bowl with grilled chicken, feta, olives, and vegetables",
+        mealType: "Lunch",
+        calories: 450,
+        protein: 35,
+        carbs: 40,
+        fat: 15,
+        sugar: 5,
+        ingredientQuality: 9,
+        ingredients: "Quinoa, chicken breast, feta cheese, olives, cucumber, tomato, olive oil"
+      },
+      {
+        name: "Protein Smoothie",
+        description: "Quick protein-packed smoothie with fruit and greens",
+        mealType: "Breakfast",
+        calories: 320,
+        protein: 24,
+        carbs: 35,
+        fat: 8,
+        sugar: 18,
+        ingredientQuality: 8,
+        ingredients: "Greek yogurt, banana, spinach, protein powder, almond milk, chia seeds"
+      },
+      {
+        name: "Veggie Stir Fry",
+        description: "Colorful vegetable stir fry with tofu and brown rice",
+        mealType: "Dinner",
+        calories: 380,
+        protein: 18,
+        carbs: 50,
+        fat: 10,
+        sugar: 8,
+        ingredientQuality: 9,
+        ingredients: "Tofu, broccoli, bell peppers, carrots, brown rice, soy sauce, ginger"
+      }
+    ];
+    
+    for (const suggestion of sampleFoodSuggestions) {
+      await db.insert(schema.foodSuggestions).values(suggestion);
+    }
+  }
+  
+  // Add sample workout suggestions if none exist
+  const workoutSuggestionsList = await db.select().from(schema.workoutSuggestions);
+  if (workoutSuggestionsList.length === 0) {
+    const sampleWorkoutSuggestions = [
+      {
+        title: "Upper Body Strength",
+        description: "Focus on chest, shoulders, and arms",
+        durationMinutes: 45,
+        intensity: "Medium",
+        type: "Strength",
+        caloriesBurned: 320,
+        instructions: "Complete 3 sets of each exercise with 60 seconds rest between sets",
+        exercises: "Push-ups, dumbbell rows, shoulder press, bicep curls, tricep dips"
+      },
+      {
+        title: "HIIT Cardio",
+        description: "High-intensity interval training for maximum calorie burn",
+        durationMinutes: 30,
+        intensity: "High",
+        type: "Cardio",
+        caloriesBurned: 450,
+        instructions: "Work for 40 seconds, rest for 20 seconds, repeat for each exercise",
+        exercises: "Jumping jacks, burpees, mountain climbers, high knees, squat jumps"
+      },
+      {
+        title: "Lower Body Power",
+        description: "Strengthen legs and glutes",
+        durationMinutes: 40,
+        intensity: "Medium-High",
+        type: "Strength",
+        caloriesBurned: 380,
+        instructions: "Complete each exercise for 45 seconds with minimal rest between movements",
+        exercises: "Squats, lunges, deadlifts, calf raises, glute bridges"
+      }
+    ];
+    
+    for (const suggestion of sampleWorkoutSuggestions) {
+      await db.insert(schema.workoutSuggestions).values(suggestion);
+    }
+  }
+  
+  // For a demo user, create some example meals, workouts and progress
+  const userId = 1; // Assuming first user is id 1
+  
+  // Check if meals exist for this user
+  const userMeals = await db.select().from(schema.meals).where(eq(schema.meals.userId, userId));
+  if (userMeals.length === 0) {
+    // Create a meal
+    const today = new Date();
+    
+    // Breakfast
+    await db.insert(schema.meals).values({
+      userId,
+      title: "Breakfast",
+      time: "08:30 AM",
+      date: today,
+      totalCalories: 435,
+      totalProtein: 24,
+      ingredientQuality: 8,
+      qualityNotes: "Balanced breakfast with good protein",
+      items: JSON.stringify([
+        {
+          name: "Greek Yogurt",
+          servings: 1,
+          calories: 130,
+          protein: 17,
+          carbs: 6,
+          fat: 4,
+          sugar: 4
+        },
+        {
+          name: "Banana",
+          servings: 1,
+          calories: 105,
+          protein: 1.3,
+          carbs: 27,
+          fat: 0.4,
+          sugar: 14
+        },
+        {
+          name: "Granola",
+          servings: 0.5,
+          calories: 200,
+          protein: 6,
+          carbs: 24,
+          fat: 8,
+          sugar: 8
+        }
+      ])
+    });
+    
+    // Lunch
+    await db.insert(schema.meals).values({
+      userId,
+      title: "Lunch",
+      time: "12:30 PM",
+      date: today,
+      totalCalories: 550,
+      totalProtein: 40,
+      ingredientQuality: 7,
+      qualityNotes: "Good protein source with vegetables",
+      items: JSON.stringify([
+        {
+          name: "Grilled Chicken Breast",
+          servings: 1,
+          calories: 165,
+          protein: 31,
+          carbs: 0,
+          fat: 3.6,
+          sugar: 0
+        },
+        {
+          name: "Brown Rice",
+          servings: 1,
+          calories: 215,
+          protein: 5,
+          carbs: 45,
+          fat: 1.8,
+          sugar: 0
+        },
+        {
+          name: "Mixed Vegetables",
+          servings: 1,
+          calories: 120,
+          protein: 4,
+          carbs: 23,
+          fat: 0.5,
+          sugar: 4
+        },
+        {
+          name: "Olive Oil",
+          servings: 1,
+          calories: 50,
+          protein: 0,
+          carbs: 0,
+          fat: 5.5,
+          sugar: 0
+        }
+      ])
+    });
+  }
+  
+  // Check if workouts exist for this user
+  const userWorkouts = await db.select().from(schema.workouts).where(eq(schema.workouts.userId, userId));
+  if (userWorkouts.length === 0) {
+    // Create a workout
+    const today = new Date();
+    
+    await db.insert(schema.workouts).values({
+      userId,
+      title: "Morning Run",
+      type: "Cardio",
+      date: today,
+      durationMinutes: 30,
+      startTime: "07:00 AM",
+      endTime: "07:30 AM",
+      caloriesBurned: 300,
+      details: JSON.stringify({
+        distance: 5,
+        pace: "6:00 min/km",
+        heartRate: 150,
+        exercises: ["Running"]
+      })
+    });
+    
+    await db.insert(schema.workouts).values({
+      userId,
+      title: "Evening Strength Training",
+      type: "Strength",
+      date: today,
+      durationMinutes: 45,
+      startTime: "06:00 PM",
+      endTime: "06:45 PM",
+      caloriesBurned: 350,
+      details: JSON.stringify({
+        sets: 3,
+        reps: "8-12",
+        rest: "60 seconds",
+        exercises: ["Push-Ups", "Squats", "Dumbbell Rows", "Lunges"]
+      })
+    });
+  }
+  
+  // Add daily progress if none exists
+  const userProgress = await db.select().from(schema.dailyProgress).where(eq(schema.dailyProgress.userId, userId));
+  if (userProgress.length === 0) {
+    const today = new Date();
+    
+    await db.insert(schema.dailyProgress).values({
+      userId,
+      date: today,
+      caloriesConsumed: 1800,
+      proteinConsumed: 95,
+      carbsConsumed: 200,
+      fatConsumed: 60,
+      sugarConsumed: 45,
+      workoutMinutes: 75,
+      caloriesBurned: 650
+    });
+  }
+}
+
+// Export an instance of the database storage
+export const storage = new DatabaseStorage();
