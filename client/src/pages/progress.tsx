@@ -46,10 +46,11 @@ export default function Progress() {
     if (currentDayProgress) {
       setProgressData(prev => {
         const newMap = new Map(prev);
-        const today = format(new Date(), "yyyy-MM-dd");
+        // Use the selected date instead of always using today
+        const dateKey = format(selectedDate, "yyyy-MM-dd");
         
         // Ensure we're handling date correctly whether it's a string or Date object
-        newMap.set(today, {
+        newMap.set(dateKey, {
           ...currentDayProgress,
           // Handle the date which might be a string from the API
           date: currentDayProgress.date instanceof Date 
@@ -60,7 +61,7 @@ export default function Progress() {
         return newMap;
       });
     }
-  }, [currentDayProgress]);
+  }, [currentDayProgress, selectedDate]);
   
   // Prepare data for charts
   const caloriesChartData = last7Days.map(date => {
@@ -115,9 +116,15 @@ export default function Progress() {
     totalCaloriesBurned: weeklyData.reduce((acc, day) => acc + day.burned, 0),
     totalWorkoutMinutes: weeklyData.reduce((acc, day) => acc + day.workoutMinutes, 0),
     avgProtein: weeklyData.reduce((acc, day) => {
-      const dateKey = format(new Date(day.date), "yyyy-MM-dd");
-      const progress = progressData.get(dateKey);
-      return acc + (progress?.proteinConsumed || 0);
+      // day.date here is already a formatted string like "Mon", "Tue", etc.
+      // We need to use the same index to get the original Date object
+      const index = weeklyData.findIndex(d => d.date === day.date);
+      if (index >= 0 && index < daysInWeek.length) {
+        const dateKey = format(daysInWeek[index], "yyyy-MM-dd");
+        const progress = progressData.get(dateKey);
+        return acc + (progress?.proteinConsumed || 0);
+      }
+      return acc;
     }, 0) / 7
   };
   
