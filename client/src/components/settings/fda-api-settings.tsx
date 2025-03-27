@@ -22,19 +22,44 @@ export default function FdaApiSettings() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [apiKeySet, setApiKeySet] = useState<boolean>(false);
   
-  // Initialize form with saved API key if available
+  // Initialize form with saved API key if available or from server environment
   useEffect(() => {
-    const savedApiKey = localStorage.getItem('fda_api_key');
-    if (savedApiKey) {
-      form.setValue('apiKey', savedApiKey);
-      setApiKeySet(true);
-      // Initialize API with saved key
+    const fetchApiKey = async () => {
       try {
-        initFdaApi(savedApiKey);
-      } catch (err) {
-        console.error('Error initializing FDA API with saved key:', err);
+        // First check localStorage
+        const savedApiKey = localStorage.getItem('fda_api_key');
+        if (savedApiKey) {
+          form.setValue('apiKey', savedApiKey);
+          setApiKeySet(true);
+          // Initialize API with saved key
+          try {
+            initFdaApi(savedApiKey);
+          } catch (err) {
+            console.error('Error initializing FDA API with saved key:', err);
+          }
+          return;
+        }
+        
+        // If not in localStorage, try to get from server environment
+        const response = await fetch('/api/config/fda-api-key');
+        const data = await response.json();
+        
+        if (data.apiKey) {
+          form.setValue('apiKey', data.apiKey);
+          setApiKeySet(true);
+          localStorage.setItem('fda_api_key', data.apiKey);
+          try {
+            initFdaApi(data.apiKey);
+          } catch (err) {
+            console.error('Error initializing FDA API with server key:', err);
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching FDA API key:', error);
       }
-    }
+    };
+    
+    fetchApiKey();
   }, []);
   
   const form = useForm<FdaApiFormValues>({

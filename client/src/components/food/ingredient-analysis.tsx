@@ -29,18 +29,39 @@ export default function IngredientAnalysis({
 }: IngredientAnalysisProps) {
   const [expanded, setExpanded] = useState(false);
   
+  // State to store analysis results
+  const [analysisResult, setAnalysisResult] = useState<{ score: number, notes: string }>({ score: 0, notes: '' });
+  
   // Perform the analysis
-  const { score, notes } = getFdaApi().analyzeIngredientQuality(ingredients, nutritionData);
+  useEffect(() => {
+    const performAnalysis = async () => {
+      try {
+        const fdaApi = await getFdaApi();
+        const result = fdaApi.analyzeIngredientQuality(ingredients, nutritionData);
+        setAnalysisResult(result);
+      } catch (error) {
+        console.error('Error performing ingredient analysis:', error);
+        // Set a default score and note if analysis fails
+        setAnalysisResult({ 
+          score: 50, 
+          notes: 'Unable to analyze ingredients. FDA API may not be properly configured.' 
+        });
+      }
+    };
+    
+    performAnalysis();
+  }, [ingredients, nutritionData]);
   
   // Call the onChange handler if provided
   useEffect(() => {
     if (onQualityScoreChange) {
-      onQualityScoreChange(score, notes);
+      onQualityScoreChange(analysisResult.score, analysisResult.notes);
     }
-  }, [score, notes, onQualityScoreChange]);
+  }, [analysisResult, onQualityScoreChange]);
   
   // Get the appropriate color based on score
   const getQualityColor = () => {
+    const { score } = analysisResult;
     if (score >= 80) return 'bg-green-500';
     if (score >= 60) return 'bg-yellow-500';
     if (score >= 40) return 'bg-orange-500';
@@ -49,6 +70,7 @@ export default function IngredientAnalysis({
   
   // Get the appropriate icon and text based on score
   const getQualityIndicator = () => {
+    const { score } = analysisResult;
     if (score >= 80) {
       return {
         icon: <ThumbsUp className="h-5 w-5 text-green-500" />,
@@ -89,14 +111,14 @@ export default function IngredientAnalysis({
       <CardContent>
         <div className="mb-2">
           <div className="flex justify-between items-center mb-1">
-            <span className="text-sm font-medium">Quality Score: {score}/100</span>
+            <span className="text-sm font-medium">Quality Score: {analysisResult.score}/100</span>
           </div>
-          <Progress value={score} className={`h-2 ${getQualityColor()}`} />
+          <Progress value={analysisResult.score} className={`h-2 ${getQualityColor()}`} />
         </div>
         
         {!expanded ? (
           <div className="mt-4">
-            <p className="text-sm text-muted-foreground line-clamp-2">{notes}</p>
+            <p className="text-sm text-muted-foreground line-clamp-2">{analysisResult.notes}</p>
             <Button 
               variant="outline" 
               size="sm" 
@@ -110,7 +132,7 @@ export default function IngredientAnalysis({
           <div className="mt-4">
             <h4 className="font-medium text-sm mb-2">Ingredient Notes:</h4>
             <ScrollArea className="h-32 rounded-md border p-2">
-              <p className="text-sm">{notes}</p>
+              <p className="text-sm">{analysisResult.notes}</p>
             </ScrollArea>
             
             <h4 className="font-medium text-sm mt-4 mb-2">Nutrition Analysis:</h4>

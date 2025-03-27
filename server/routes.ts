@@ -290,6 +290,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Config routes
+  app.get("/api/config/fda-api-key", (req, res) => {
+    const apiKey = process.env.FDA_API_KEY || "";
+    res.status(200).json({ apiKey });
+  });
+  
   // Suggestions routes
   app.get("/api/food-suggestions", async (req, res) => {
     try {

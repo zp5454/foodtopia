@@ -453,7 +453,8 @@ export class MemStorage implements IStorage {
     const exercisesData: InsertExercise[] = [
       { name: "Running", type: "cardio", caloriesPerMinute: 10, instructions: "Maintain steady pace", intensity: "medium", durationMinutes: 25 },
       { name: "Upper Body Strength", type: "strength", caloriesPerMinute: 8, instructions: "Focus on proper form", intensity: "medium", durationMinutes: 30 },
-      { name: "HIIT Cardio", type: "cardio", caloriesPerMinute: 12, instructions: "20 seconds on, 10 seconds rest", intensity: "high", durationMinutes: 20 }
+      { name: "HIIT Cardio", type: "cardio", caloriesPerMinute: 12, instructions: "20 seconds on, 10 seconds rest", intensity: "high", durationMinutes: 20 },
+      { name: "Rowing", type: "cardio", caloriesPerMinute: 11, instructions: "Maintain proper form and consistent pace", intensity: "medium", durationMinutes: 25 }
     ];
     
     exercisesData.forEach(exercise => {

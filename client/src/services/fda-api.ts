@@ -154,9 +154,36 @@ export const initFdaApi = (apiKey: string): FdaApiService => {
   return fdaApiService;
 };
 
-export const getFdaApi = (): FdaApiService => {
+export const getFdaApi = async (): Promise<FdaApiService> => {
   if (!fdaApiService) {
-    throw new Error('FDA API service not initialized. Call initFdaApi first.');
+    try {
+      // Try to get API key from localStorage first
+      const localStorageKey = typeof window !== 'undefined' ? localStorage.getItem('fda_api_key') : null;
+      
+      if (localStorageKey) {
+        fdaApiService = new FdaApiService({ apiKey: localStorageKey });
+        return fdaApiService;
+      }
+      
+      // If not in localStorage, try to get from server environment
+      const response = await fetch('/api/config/fda-api-key');
+      const data = await response.json();
+      
+      if (data.apiKey) {
+        fdaApiService = new FdaApiService({ apiKey: data.apiKey });
+        // Save to localStorage for future use
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('fda_api_key', data.apiKey);
+        }
+        return fdaApiService;
+      }
+      
+      throw new Error('FDA API service not initialized. Call initFdaApi first or set up API key in settings.');
+    } catch (error) {
+      console.error('Error initializing FDA API service:', error);
+      throw new Error('FDA API service not initialized. Call initFdaApi first or set up API key in settings.');
+    }
   }
+  
   return fdaApiService;
 };

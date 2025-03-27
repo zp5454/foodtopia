@@ -38,7 +38,7 @@ export default function Progress() {
   
   // Fetch daily progress for the selected date
   const { data: currentDayProgress } = useQuery<DailyProgress>({
-    queryKey: [`/api/daily-progress?userId=${userId}&date=${new Date().toISOString().split('T')[0]}`],
+    queryKey: [`/api/daily-progress?userId=${userId}&date=${selectedDate.toISOString().split('T')[0]}`],
   });
   
   // Use a single effect to update the progress data 
