@@ -76,7 +76,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       if (dateStr) {
-        const date = new Date(dateStr);
+        // Parse date in YYYY-MM-DD format
+        let date;
+        if (dateStr.includes('T')) {
+          // If it's an ISO string, extract just the date part
+          date = new Date(dateStr.split('T')[0]);
+        } else {
+          // Otherwise assume it's already in YYYY-MM-DD format
+          date = new Date(dateStr);
+        }
         const meals = await storage.getMealsByDate(userId, date);
         return res.json(meals);
       }
@@ -139,7 +147,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       if (dateStr) {
-        const date = new Date(dateStr);
+        // Parse date in YYYY-MM-DD format
+        let date;
+        if (dateStr.includes('T')) {
+          // If it's an ISO string, extract just the date part
+          date = new Date(dateStr.split('T')[0]);
+        } else {
+          // Otherwise assume it's already in YYYY-MM-DD format
+          date = new Date(dateStr);
+        }
         const workouts = await storage.getWorkoutsByDate(userId, date);
         return res.json(workouts);
       }
@@ -225,13 +241,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/daily-progress", async (req, res) => {
     try {
       const userId = parseInt(req.query.userId as string);
-      const dateStr = req.query.date as string || new Date().toISOString();
+      const dateStr = req.query.date as string || new Date().toISOString().split('T')[0];
       
       if (!userId) {
         return res.status(400).json({ message: "userId is required" });
       }
       
-      const date = new Date(dateStr);
+      // Parse date in YYYY-MM-DD format
+      let date;
+      if (dateStr.includes('T')) {
+        // If it's an ISO string, extract just the date part
+        date = new Date(dateStr.split('T')[0]);
+      } else {
+        // Otherwise assume it's already in YYYY-MM-DD format
+        date = new Date(dateStr);
+      }
+      
       const progress = await storage.getDailyProgress(userId, date);
       
       if (!progress) {

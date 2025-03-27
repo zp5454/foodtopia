@@ -24,7 +24,7 @@ export default function Workout() {
   // Fetch workouts
   const { data: workouts = [], isLoading: isLoadingWorkouts } = useQuery<Workout[]>({
     queryKey: [
-      `/api/workouts?userId=${userId}&date=${selectedDate.toISOString()}`
+      `/api/workouts?userId=${userId}&date=${selectedDate.toISOString().split('T')[0]}`
     ],
   });
   

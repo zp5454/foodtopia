@@ -116,8 +116,12 @@ export default function AddMealDialog({ open, onOpenChange, userId, date }: AddM
       const totalCalories = values.items.reduce((sum, item) => sum + item.calories, 0);
       const totalProtein = values.items.reduce((sum, item) => sum + (item.protein || 0), 0);
       
+      // Ensure date is in the correct format (YYYY-MM-DD)
+      const formattedDate = new Date(values.date).toISOString().split('T')[0];
+      
       const mealData = {
         ...values,
+        date: formattedDate,
         totalCalories,
         totalProtein,
       };
@@ -142,8 +146,8 @@ export default function AddMealDialog({ open, onOpenChange, userId, date }: AddM
       });
       
       // Invalidate queries to refresh data
-      queryClient.invalidateQueries({ queryKey: [`/api/meals?userId=${userId}&date=${date.toISOString()}`] });
-      queryClient.invalidateQueries({ queryKey: [`/api/daily-progress?userId=${userId}&date=${date.toISOString()}`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/meals?userId=${userId}&date=${date.toISOString().split('T')[0]}`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/daily-progress?userId=${userId}&date=${date.toISOString().split('T')[0]}`] });
       
       onOpenChange(false);
     },

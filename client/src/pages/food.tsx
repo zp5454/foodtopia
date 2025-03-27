@@ -24,7 +24,7 @@ export default function Food() {
   // Fetch meals
   const { data: meals = [], isLoading: isLoadingMeals } = useQuery<Meal[]>({
     queryKey: [
-      `/api/meals?userId=${userId}&date=${selectedDate.toISOString()}`
+      `/api/meals?userId=${userId}&date=${selectedDate.toISOString().split('T')[0]}`
     ],
   });
   

@@ -107,7 +107,13 @@ export default function AddWorkoutDialog({ open, onOpenChange, userId, date }: A
   // Add workout mutation
   const addWorkoutMutation = useMutation({
     mutationFn: async (values: WorkoutFormValues) => {
-      return await apiRequest("POST", "/api/workouts", values);
+      // Ensure date is in the correct format (YYYY-MM-DD)
+      const formattedDate = new Date(values.date).toISOString().split('T')[0];
+      
+      return await apiRequest("POST", "/api/workouts", {
+        ...values,
+        date: formattedDate,
+      });
     },
     onSuccess: () => {
       toast({
@@ -136,8 +142,8 @@ export default function AddWorkoutDialog({ open, onOpenChange, userId, date }: A
       });
       
       // Invalidate queries to refresh data
-      queryClient.invalidateQueries({ queryKey: [`/api/workouts?userId=${userId}&date=${date.toISOString()}`] });
-      queryClient.invalidateQueries({ queryKey: [`/api/daily-progress?userId=${userId}&date=${date.toISOString()}`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/workouts?userId=${userId}&date=${date.toISOString().split('T')[0]}`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/daily-progress?userId=${userId}&date=${date.toISOString().split('T')[0]}`] });
       
       onOpenChange(false);
     },
