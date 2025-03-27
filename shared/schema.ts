@@ -64,17 +64,23 @@ export const meals = pgTable("meals", {
   qualityNotes: text("quality_notes"),
 });
 
-export const insertMealSchema = createInsertSchema(meals).pick({
-  userId: true,
-  title: true,
-  date: true,
-  time: true,
-  totalCalories: true,
-  totalProtein: true,
-  items: true,
-  ingredientQuality: true,
-  qualityNotes: true,
-});
+export const insertMealSchema = createInsertSchema(meals)
+  .pick({
+    userId: true,
+    title: true,
+    date: true,
+    time: true,
+    totalCalories: true,
+    totalProtein: true,
+    items: true,
+    ingredientQuality: true,
+    qualityNotes: true,
+  })
+  .extend({
+    // Add transform to ensure dates are properly handled 
+    // whether they're strings or Date objects
+    date: z.coerce.date(),
+  });
 
 // Exercise Schema
 export const exercises = pgTable("exercises", {
@@ -110,17 +116,22 @@ export const workouts = pgTable("workouts", {
   details: json("details").notNull(), // Additional metrics like distance, pace, etc.
 });
 
-export const insertWorkoutSchema = createInsertSchema(workouts).pick({
-  userId: true,
-  title: true,
-  date: true,
-  startTime: true,
-  endTime: true,
-  caloriesBurned: true,
-  durationMinutes: true,
-  type: true,
-  details: true,
-});
+export const insertWorkoutSchema = createInsertSchema(workouts)
+  .pick({
+    userId: true,
+    title: true,
+    date: true,
+    startTime: true,
+    endTime: true,
+    caloriesBurned: true,
+    durationMinutes: true,
+    type: true,
+    details: true,
+  })
+  .extend({
+    // Add transform to ensure dates are properly handled
+    date: z.coerce.date(),
+  });
 
 // Progress Schema
 export const dailyProgress = pgTable("daily_progress", {
@@ -136,17 +147,22 @@ export const dailyProgress = pgTable("daily_progress", {
   caloriesBurned: integer("calories_burned").default(0),
 });
 
-export const insertDailyProgressSchema = createInsertSchema(dailyProgress).pick({
-  userId: true,
-  date: true,
-  caloriesConsumed: true,
-  proteinConsumed: true,
-  carbsConsumed: true,
-  fatConsumed: true,
-  sugarConsumed: true,
-  workoutMinutes: true,
-  caloriesBurned: true,
-});
+export const insertDailyProgressSchema = createInsertSchema(dailyProgress)
+  .pick({
+    userId: true,
+    date: true,
+    caloriesConsumed: true,
+    proteinConsumed: true,
+    carbsConsumed: true,
+    fatConsumed: true,
+    sugarConsumed: true,
+    workoutMinutes: true,
+    caloriesBurned: true,
+  })
+  .extend({
+    // Add transform to ensure dates are properly handled
+    date: z.coerce.date(),
+  });
 
 // Suggestions Schema
 export const foodSuggestions = pgTable("food_suggestions", {

@@ -46,8 +46,17 @@ export default function Progress() {
     if (currentDayProgress) {
       setProgressData(prev => {
         const newMap = new Map(prev);
-        const dateKey = format(new Date(), "yyyy-MM-dd");
-        newMap.set(dateKey, currentDayProgress);
+        const today = format(new Date(), "yyyy-MM-dd");
+        
+        // Ensure we're handling date correctly whether it's a string or Date object
+        newMap.set(today, {
+          ...currentDayProgress,
+          // Handle the date which might be a string from the API
+          date: currentDayProgress.date instanceof Date 
+            ? currentDayProgress.date 
+            : new Date(currentDayProgress.date)
+        });
+        
         return newMap;
       });
     }
