@@ -23,6 +23,7 @@ import { Loader2, Save } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
+import FdaApiSettings from "@/components/settings/fda-api-settings";
 
 const nutritionGoalsSchema = z.object({
   calorieGoal: z.coerce.number().min(500, "Must be at least 500").max(10000, "Must be at most 10000"),
@@ -64,12 +65,12 @@ export default function Settings() {
   useEffect(() => {
     if (user) {
       form.reset({
-        calorieGoal: user.calorieGoal,
-        proteinGoal: user.proteinGoal,
-        carbsGoal: user.carbsGoal,
-        fatGoal: user.fatGoal,
-        sugarGoal: user.sugarGoal,
-        workoutGoal: user.workoutGoal,
+        calorieGoal: user.calorieGoal ?? undefined,
+        proteinGoal: user.proteinGoal ?? undefined,
+        carbsGoal: user.carbsGoal ?? undefined,
+        fatGoal: user.fatGoal ?? undefined,
+        sugarGoal: user.sugarGoal ?? undefined,
+        workoutGoal: user.workoutGoal ?? undefined,
       });
     }
   }, [user, form]);
@@ -139,7 +140,7 @@ export default function Settings() {
             </CardContent>
           </Card>
           
-          <Card>
+          <Card className="mb-6">
             <CardHeader>
               <CardTitle>Nutrition Goals</CardTitle>
               <CardDescription>Customize your daily nutrition targets</CardDescription>
@@ -253,6 +254,11 @@ export default function Settings() {
               )}
             </CardContent>
           </Card>
+          
+          {/* FDA API Settings */}
+          <div className="mb-6">
+            <FdaApiSettings />
+          </div>
         </div>
       </main>
       

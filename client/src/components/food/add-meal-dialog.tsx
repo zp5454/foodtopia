@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
 import { apiRequest } from "@/lib/queryClient";
@@ -33,13 +33,16 @@ import {
   Card,
   CardContent
 } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm, useFieldArray } from "react-hook-form";
 import { z } from "zod";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Trash2, Search, Loader2 } from "lucide-react";
+import { Plus, Trash2, Search, Loader2, Barcode, Camera } from "lucide-react";
 import { format } from "date-fns";
 import { type FoodItem } from "@shared/schema";
+import BarcodeScanner from "@/components/food/barcode-scanner";
+import { getFdaApi } from "@/services/fda-api";
 
 // Form schema
 const mealItemSchema = z.object({
@@ -70,6 +73,9 @@ interface AddMealDialogProps {
 
 export default function AddMealDialog({ open, onOpenChange, userId, date }: AddMealDialogProps) {
   const [searchTerm, setSearchTerm] = useState("");
+  const [showScanner, setShowScanner] = useState(false);
+  const [scannerTab, setScannerTab] = useState<string>("search");
+  const [isProcessingBarcode, setIsProcessingBarcode] = useState(false);
   const { toast } = useToast();
   
   // Fetch food items for dropdown
@@ -164,6 +170,115 @@ export default function AddMealDialog({ open, onOpenChange, userId, date }: AddM
       protein: item.protein
     });
     setSearchTerm("");
+  };
+  
+  // Handle barcode scan results
+  const handleBarcodeScan = async (barcodeData: string) => {
+    try {
+      setIsProcessingBarcode(true);
+      
+      // Check if FDA API is configured
+      const fdaApi = getFdaApi();
+      if (!fdaApi) {
+        toast({
+          title: "FDA API Key Required",
+          description: "Please add your FDA API key in Settings to use barcode scanning.",
+          variant: "destructive",
+        });
+        setShowScanner(false);
+        setIsProcessingBarcode(false);
+        return;
+      }
+      
+      // Search for food by UPC barcode
+      const result = await fdaApi.searchByUpc(barcodeData);
+      
+      if (result && result.foods && result.foods.length > 0) {
+        const foodData = result.foods[0];
+        
+        // Extract nutrition data if available
+        const nutritionData = foodData.foodNutrients?.reduce((acc: any, item: any) => {
+          if (item.nutrientName === "Energy" && item.unitName === "KCAL") {
+            acc.calories = Math.round(item.value);
+          } else if (item.nutrientName === "Protein") {
+            acc.protein = Math.round(item.value);
+          } else if (item.nutrientName === "Total lipid (fat)") {
+            acc.fat = Math.round(item.value);
+          } else if (item.nutrientName === "Carbohydrate, by difference") {
+            acc.carbs = Math.round(item.value);
+          } else if (item.nutrientName === "Sugars, total including NLEA") {
+            acc.sugar = Math.round(item.value);
+          }
+          return acc;
+        }, { calories: 0, protein: 0, fat: 0, carbs: 0, sugar: 0 });
+        
+        // Get ingredient quality analysis if ingredients are available
+        let ingredientQuality = 4; // Default to excellent
+        let qualityNotes = "";
+        
+        if (foodData.ingredients) {
+          const analysis = fdaApi.analyzeIngredientQuality(foodData.ingredients, nutritionData);
+          ingredientQuality = analysis.score;
+          qualityNotes = analysis.notes;
+        }
+        
+        // Create new food item
+        const newFoodItem = {
+          id: Date.now(), // Temporary ID for this session
+          name: foodData.description || foodData.brandName || "Scanned Food Item",
+          calories: nutritionData.calories || 0,
+          protein: nutritionData.protein || 0,
+          carbs: nutritionData.carbs || 0,
+          fat: nutritionData.fat || 0,
+          sugar: nutritionData.sugar || 0,
+          ingredientQuality: ingredientQuality,
+          qualityNotes: qualityNotes
+        };
+        
+        // Add food item to the meal
+        append({
+          id: newFoodItem.id,
+          name: newFoodItem.name,
+          calories: newFoodItem.calories,
+          protein: newFoodItem.protein
+        });
+        
+        // Update ingredient quality if it's lower than current
+        const currentQuality = form.getValues("ingredientQuality");
+        if (ingredientQuality < currentQuality) {
+          form.setValue("ingredientQuality", ingredientQuality);
+          form.setValue("qualityNotes", qualityNotes);
+        }
+        
+        // Close scanner
+        setShowScanner(false);
+        
+        toast({
+          title: "Food Item Added",
+          description: `Added ${newFoodItem.name} to your meal.`,
+        });
+      } else {
+        toast({
+          title: "Product Not Found",
+          description: "No information found for this barcode. Try a different product or add manually.",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error("Error processing barcode:", error);
+      toast({
+        title: "Scan Failed",
+        description: "Could not process the barcode. Please try again or add food manually.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsProcessingBarcode(false);
+    }
+  };
+  
+  // Toggle barcode scanner
+  const toggleScanner = () => {
+    setShowScanner(!showScanner);
   };
   
   // Calculate total calories
@@ -266,47 +381,97 @@ export default function AddMealDialog({ open, onOpenChange, userId, date }: AddM
               </div>
             </div>
             
-            <div className="space-y-2">
-              <div className="relative">
-                <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                <Input
-                  placeholder="Search food items..."
-                  className="pl-9"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
-              </div>
+            <Tabs defaultValue="search" className="w-full" value={scannerTab} onValueChange={setScannerTab}>
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="search" onClick={() => setShowScanner(false)}>
+                  <Search className="mr-2 h-4 w-4" />
+                  Search
+                </TabsTrigger>
+                <TabsTrigger value="barcode" onClick={() => setShowScanner(true)}>
+                  <Barcode className="mr-2 h-4 w-4" />
+                  Scan Barcode
+                </TabsTrigger>
+              </TabsList>
               
-              {searchTerm && (
-                <Card className="max-h-[200px] overflow-y-auto">
-                  <CardContent className="p-2 space-y-1">
-                    {filteredFoodItems.length > 0 ? (
-                      filteredFoodItems.map((item) => (
-                        <div 
-                          key={item.id} 
-                          className="flex justify-between items-center p-2 hover:bg-gray-50 rounded cursor-pointer"
-                          onClick={() => handleAddFoodItem(item)}
-                        >
-                          <div>
-                            <div className="font-medium text-sm">{item.name}</div>
-                            <div className="text-xs text-gray-500">
-                              {item.calories} cal | {item.protein}g protein
+              <TabsContent value="search" className="space-y-2">
+                <div className="relative">
+                  <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                  <Input
+                    placeholder="Search food items..."
+                    className="pl-9"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                  />
+                </div>
+                
+                {searchTerm && (
+                  <Card className="max-h-[200px] overflow-y-auto">
+                    <CardContent className="p-2 space-y-1">
+                      {filteredFoodItems.length > 0 ? (
+                        filteredFoodItems.map((item) => (
+                          <div 
+                            key={item.id} 
+                            className="flex justify-between items-center p-2 hover:bg-gray-50 rounded cursor-pointer"
+                            onClick={() => handleAddFoodItem(item)}
+                          >
+                            <div>
+                              <div className="font-medium text-sm">{item.name}</div>
+                              <div className="text-xs text-gray-500">
+                                {item.calories} cal | {item.protein}g protein
+                              </div>
                             </div>
+                            <Button variant="ghost" size="icon">
+                              <Plus className="h-4 w-4" />
+                            </Button>
                           </div>
-                          <Button variant="ghost" size="icon">
-                            <Plus className="h-4 w-4" />
-                          </Button>
+                        ))
+                      ) : (
+                        <div className="text-center py-2 text-sm text-gray-500">
+                          No matching food items found
                         </div>
-                      ))
-                    ) : (
-                      <div className="text-center py-2 text-sm text-gray-500">
-                        No matching food items found
+                      )}
+                    </CardContent>
+                  </Card>
+                )}
+              </TabsContent>
+              
+              <TabsContent value="barcode" className="space-y-4">
+                {showScanner ? (
+                  <div className="relative">
+                    <BarcodeScanner 
+                      onScanSuccess={handleBarcodeScan} 
+                      onClose={() => setShowScanner(false)} 
+                    />
+                    {isProcessingBarcode && (
+                      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center rounded-md">
+                        <div className="bg-background p-4 rounded-lg flex flex-col items-center">
+                          <Loader2 className="h-8 w-8 animate-spin text-primary mb-2" />
+                          <p className="text-sm font-medium">Processing barcode data...</p>
+                        </div>
                       </div>
                     )}
-                  </CardContent>
-                </Card>
-              )}
-            </div>
+                  </div>
+                ) : (
+                  <div className="text-center p-6 border border-dashed rounded-md bg-muted/30 flex flex-col items-center">
+                    <Camera className="h-8 w-8 mb-2 text-muted-foreground" />
+                    <h3 className="text-base font-medium mb-1">Scan Food Package Barcode</h3>
+                    <p className="text-sm text-muted-foreground mb-3">
+                      Use your camera to scan a barcode and automatically add food data
+                    </p>
+                    <Button 
+                      variant="secondary"
+                      size="sm"
+                      onClick={toggleScanner}
+                    >
+                      <Camera className="mr-2 h-4 w-4" /> Start Scanner
+                    </Button>
+                  </div>
+                )}
+                <div className="text-xs text-muted-foreground text-center">
+                  Barcode scanning requires an FDA API key configured in Settings.
+                </div>
+              </TabsContent>
+            </Tabs>
             
             <FormField
               control={form.control}
