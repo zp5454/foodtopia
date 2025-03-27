@@ -237,15 +237,18 @@ export default function AddMealDialog({ open, onOpenChange, userId, date }: AddM
   };
   
   // Handle barcode scan results
-  const handleBarcodeScan = async (barcodeData: string) => {
+  const handleBarcodeScan = async (barcodeData: any) => {
     try {
       setIsProcessingBarcode(true);
       
       // Get FDA API service
       const fdaApi = getFdaApi();
       
+      // Make sure we're passing a string to the API
+      const barcode = typeof barcodeData === 'string' ? barcodeData : barcodeData?.barcode || '';
+      
       // Search for food by UPC barcode
-      const result = await fdaApi.searchByUpc(barcodeData);
+      const result = await fdaApi.searchByUpc(barcode);
       
       if (result && result.foods && result.foods.length > 0) {
         const foodData = result.foods[0];

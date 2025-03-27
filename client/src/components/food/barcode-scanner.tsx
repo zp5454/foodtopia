@@ -21,7 +21,9 @@ export default function BarcodeScanner({ onScanSuccess, onClose }: BarcodeScanne
       if (isScanning) {
         setIsScanning(false);
         setIsProcessing(true);
-        handleBarcode(result.getText());
+        const barcodeText = result.getText();
+        console.log("Scanned barcode text:", barcodeText);
+        handleBarcode(barcodeText);
       }
     },
     onError(error) {

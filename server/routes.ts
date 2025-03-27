@@ -300,8 +300,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   app.get("/api/fda/barcode/:upc", async (req, res) => {
     try {
-      const upc = req.params.upc;
+      let upc = req.params.upc;
       const apiKey = process.env.FDA_API_KEY;
+      
+      // Handle case when an object is sent (malformed request)
+      if (upc && upc.startsWith("[object")) {
+        return res.status(400).json({ 
+          message: "Invalid UPC format. Send only the barcode string."
+        });
+      }
       
       if (!upc) {
         return res.status(400).json({ message: "UPC barcode is required" });
