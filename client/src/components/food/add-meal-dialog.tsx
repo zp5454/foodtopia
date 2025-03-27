@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useState } from "react";
+import { useMutation } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
 import { apiRequest } from "@/lib/queryClient";
 import { 
@@ -17,7 +17,6 @@ import {
   SelectContent,
   SelectGroup,
   SelectItem,
-  SelectLabel,
   SelectTrigger,
   SelectValue
 } from "@/components/ui/select";
@@ -241,40 +240,25 @@ export default function AddMealDialog({ open, onOpenChange, userId, date }: AddM
     try {
       setIsProcessingBarcode(true);
       
-      // Get FDA API service
-      const fdaApi = getFdaApi();
+      console.log("Original barcode data received:", barcodeData);
       
-      // Make sure we're passing a string to the API
-      const barcode = typeof barcodeData === 'string' ? barcodeData : barcodeData?.barcode || '';
-      
-      // Search for food by UPC barcode
-      const result = await fdaApi.searchByUpc(barcode);
-      
-      if (result && result.foods && result.foods.length > 0) {
-        const foodData = result.foods[0];
+      // If barcodeData is already a food object from the scanner
+      if (barcodeData && barcodeData.nutrients) {
+        console.log("Using pre-processed food data from scanner");
         
-        // Extract nutrition data if available
-        const nutritionData = foodData.foodNutrients?.reduce((acc: any, item: any) => {
-          if (item.nutrientName === "Energy" && item.unitName === "KCAL") {
-            acc.calories = Math.round(item.value);
-          } else if (item.nutrientName === "Protein") {
-            acc.protein = Math.round(item.value);
-          } else if (item.nutrientName === "Total lipid (fat)") {
-            acc.fat = Math.round(item.value);
-          } else if (item.nutrientName === "Carbohydrate, by difference") {
-            acc.carbs = Math.round(item.value);
-          } else if (item.nutrientName === "Sugars, total including NLEA") {
-            acc.sugar = Math.round(item.value);
-          }
-          return acc;
-        }, { calories: 0, protein: 0, fat: 0, carbs: 0, sugar: 0 });
+        // Process nutrients from the barcode scanner
+        const nutrients = barcodeData.nutrients;
+        const ingredientData = barcodeData.ingredients || '';
+        
+        // Get FDA API service for ingredient analysis
+        const fdaApi = getFdaApi();
         
         // Get ingredient quality analysis if ingredients are available
         let ingredientQuality = 4; // Default to excellent
         let qualityNotes = "";
         
-        if (foodData.ingredients) {
-          const analysis = fdaApi.analyzeIngredientQuality(foodData.ingredients, nutritionData);
+        if (ingredientData) {
+          const analysis = fdaApi.analyzeIngredientQuality(ingredientData, nutrients);
           ingredientQuality = analysis.score;
           qualityNotes = analysis.notes;
         }
@@ -282,15 +266,17 @@ export default function AddMealDialog({ open, onOpenChange, userId, date }: AddM
         // Create new food item
         const newFoodItem = {
           id: Date.now(), // Temporary ID for this session
-          name: foodData.description || foodData.brandName || "Scanned Food Item",
-          calories: nutritionData.calories || 0,
-          protein: nutritionData.protein || 0,
-          carbs: nutritionData.carbs || 0,
-          fat: nutritionData.fat || 0,
-          sugar: nutritionData.sugar || 0,
+          name: barcodeData.name || "Scanned Food Item",
+          calories: nutrients.calories || 0,
+          protein: nutrients.protein || 0,
+          carbs: nutrients.carbs || 0,
+          fat: nutrients.fat || 0,
+          sugar: nutrients.sugar || 0,
           ingredientQuality: ingredientQuality,
           qualityNotes: qualityNotes
         };
+        
+        console.log("Created food item from scanner data:", newFoodItem);
         
         // Add food item to the meal
         append({
@@ -315,11 +301,93 @@ export default function AddMealDialog({ open, onOpenChange, userId, date }: AddM
           description: `Added ${newFoodItem.name} to your meal.`,
         });
       } else {
-        toast({
-          title: "Product Not Found",
-          description: "No information found for this barcode. Try a different product or add manually.",
-          variant: "destructive",
-        });
+        // If we just received a barcode string, do the FDA API lookup
+        console.log("Doing FDA API lookup for barcode");
+        
+        // Get FDA API service
+        const fdaApi = getFdaApi();
+        
+        // Make sure we're passing a string to the API
+        const barcode = typeof barcodeData === 'string' ? barcodeData : barcodeData?.barcode || '';
+        
+        // Search for food by UPC barcode
+        const result = await fdaApi.searchByUpc(barcode);
+        console.log("FDA API Result in meal dialog:", result);
+        
+        if (result && result.foods && result.foods.length > 0) {
+          const foodData = result.foods[0];
+          console.log("Selected food item in meal dialog:", foodData);
+          
+          // Extract nutrition data if available
+          const nutritionData = foodData.foodNutrients?.reduce((acc: any, item: any) => {
+            if (item.nutrientName === "Energy" && item.unitName === "KCAL") {
+              acc.calories = Math.round(item.value);
+            } else if (item.nutrientName === "Protein") {
+              acc.protein = Math.round(item.value);
+            } else if (item.nutrientName === "Total lipid (fat)") {
+              acc.fat = Math.round(item.value);
+            } else if (item.nutrientName === "Carbohydrate, by difference") {
+              acc.carbs = Math.round(item.value);
+            } else if (item.nutrientName === "Sugars, total including NLEA") {
+              acc.sugar = Math.round(item.value);
+            }
+            return acc;
+          }, { calories: 0, protein: 0, fat: 0, carbs: 0, sugar: 0 });
+          
+          // Get ingredient quality analysis if ingredients are available
+          let ingredientQuality = 4; // Default to excellent
+          let qualityNotes = "";
+          
+          if (foodData.ingredients) {
+            const analysis = fdaApi.analyzeIngredientQuality(foodData.ingredients, nutritionData);
+            ingredientQuality = analysis.score;
+            qualityNotes = analysis.notes;
+          }
+          
+          // Create new food item
+          const newFoodItem = {
+            id: Date.now(), // Temporary ID for this session
+            name: foodData.description || foodData.brandName || "Scanned Food Item",
+            calories: nutritionData.calories || 0,
+            protein: nutritionData.protein || 0,
+            carbs: nutritionData.carbs || 0,
+            fat: nutritionData.fat || 0,
+            sugar: nutritionData.sugar || 0,
+            ingredientQuality: ingredientQuality,
+            qualityNotes: qualityNotes
+          };
+          
+          console.log("Created food item from FDA API:", newFoodItem);
+        
+          // Add food item to the meal
+          append({
+            id: newFoodItem.id,
+            name: newFoodItem.name,
+            calories: newFoodItem.calories,
+            protein: newFoodItem.protein
+          });
+          
+          // Update ingredient quality if it's lower than current
+          const currentQuality = form.getValues("ingredientQuality");
+          if (ingredientQuality < currentQuality) {
+            form.setValue("ingredientQuality", ingredientQuality);
+            form.setValue("qualityNotes", qualityNotes);
+          }
+          
+          // Close scanner
+          setShowScanner(false);
+          
+          toast({
+            title: "Food Item Added",
+            description: `Added ${newFoodItem.name} to your meal.`,
+          });
+        } else {
+          toast({
+            title: "Product Not Found",
+            description: "No information found for this barcode. Try a different product or add manually.",
+            variant: "destructive",
+          });
+        }
       }
     } catch (error) {
       console.error("Error processing barcode:", error);

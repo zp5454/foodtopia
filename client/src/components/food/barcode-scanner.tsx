@@ -40,16 +40,20 @@ export default function BarcodeScanner({ onScanSuccess, onClose }: BarcodeScanne
 
   const handleBarcode = async (barcode: string) => {
     try {
+      console.log("Scanning barcode:", barcode);
       const fdaApi = getFdaApi();
       const result = await fdaApi.searchByUpc(barcode);
       
+      console.log("FDA API Result:", result);
+      
       if (result && result.foods && result.foods.length > 0) {
         const food = result.foods[0];
+        console.log("Selected food item:", food);
         
         // Format the data for our app
         const formattedFood = {
-          name: food.description || 'Unknown Food',
-          brandName: food.brandName || '',
+          name: food.description || food.brandedFoodCategory || 'Unknown Food',
+          brandName: food.brandName || food.brandOwner || '',
           barcode: barcode,
           ingredients: food.ingredients || '',
           servingSize: food.servingSize || 0,
@@ -58,6 +62,7 @@ export default function BarcodeScanner({ onScanSuccess, onClose }: BarcodeScanne
           fdcId: food.fdcId
         };
         
+        console.log("Formatted food data:", formattedFood);
         onScanSuccess(formattedFood);
       } else {
         setError('Food not found in database. Try entering details manually.');
