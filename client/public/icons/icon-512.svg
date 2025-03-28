@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <rect width="512" height="512" fill="#4299e1" rx="64" ry="64"/>
+  <text x="256" y="300" font-family="Arial, sans-serif" font-size="200" font-weight="bold" fill="white" text-anchor="middle">F</text>
+  <text x="256" y="380" font-family="Arial, sans-serif" font-size="64" font-weight="bold" fill="white" text-anchor="middle">BETA</text>
+</svg>
