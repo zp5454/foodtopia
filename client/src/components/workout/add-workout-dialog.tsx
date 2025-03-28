@@ -391,10 +391,12 @@ export default function AddWorkoutDialog({ open, onOpenChange, userId, date }: A
                               const seconds = parseInt(e.target.value) || 0;
                               const currentValue = field.value || 0;
                               const minutes = Math.floor(currentValue);
+                              // Store seconds as fraction of a minute, but don't modify the whole minutes part
                               const newValue = minutes + (seconds / 60);
                               field.onChange(newValue);
                             }}
-                            value={field.value ? Math.floor((field.value % 1) * 60) : ''}
+                            // Only display the seconds part for input
+                            value={field.value ? Math.round((field.value % 1) * 60) : ''}
                           />
                           <p className="text-xs text-center mt-1">Seconds</p>
                         </div>
@@ -410,11 +412,11 @@ export default function AddWorkoutDialog({ open, onOpenChange, userId, date }: A
                               const ms = parseInt(e.target.value) || 0;
                               const currentValue = field.value || 0;
                               const minutes = Math.floor(currentValue);
-                              const seconds = Math.floor((currentValue % 1) * 60);
+                              const seconds = Math.round((currentValue % 1) * 60);
                               const newValue = minutes + (seconds / 60) + (ms / 60000);
                               field.onChange(newValue);
                             }}
-                            value={field.value ? Math.floor(((field.value % 1) * 60 % 1) * 1000) : ''}
+                            value={field.value ? Math.round(((field.value % 1) * 60 % 1) * 1000) : ''}
                           />
                           <p className="text-xs text-center mt-1">Millisec</p>
                         </div>

@@ -62,8 +62,8 @@ export default function WorkoutCard({ workout }: WorkoutCardProps) {
       // Get the date from the workout to use in the query key
       const date = new Date(workout.date);
       // Invalidate both the workouts list and the daily progress
-      queryClient.invalidateQueries({ queryKey: [`/api/workouts?userId=${workout.userId}&date=${date.toISOString()}`] });
-      queryClient.invalidateQueries({ queryKey: [`/api/daily-progress?userId=${workout.userId}&date=${date.toISOString()}`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/workouts?userId=${workout.userId}&date=${date.toISOString().split('T')[0]}`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/daily-progress?userId=${workout.userId}&date=${date.toISOString().split('T')[0]}`] });
       
       toast({
         title: "Workout deleted",
@@ -86,6 +86,18 @@ export default function WorkoutCard({ workout }: WorkoutCardProps) {
     deleteMutation.mutate();
   };
   
+  // Format duration to display properly
+  const formatDuration = (duration: number) => {
+    const minutes = Math.floor(duration);
+    const seconds = Math.round((duration % 1) * 60);
+    
+    if (seconds === 0) {
+      return `${minutes} min`;
+    } else {
+      return `${minutes} min ${seconds} sec`;
+    }
+  };
+  
   // Extract workout details
   const details = workout.details as any;
   
@@ -102,7 +114,9 @@ export default function WorkoutCard({ workout }: WorkoutCardProps) {
               <p className="text-xs text-gray-500">{workout.startTime} - {workout.endTime}</p>
               <div className="flex gap-2 mt-1">
                 <span className="text-xs bg-gray-100 px-2 py-0.5 rounded-full">{workout.caloriesBurned} cal burned</span>
-                <span className="text-xs bg-gray-100 px-2 py-0.5 rounded-full">{workout.durationMinutes} mins</span>
+                <span className="text-xs bg-gray-100 px-2 py-0.5 rounded-full">
+                  {formatDuration(workout.durationMinutes)}
+                </span>
               </div>
             </div>
           </div>
@@ -162,6 +176,20 @@ export default function WorkoutCard({ workout }: WorkoutCardProps) {
                 <div className="flex justify-between mb-2">
                   <span className="text-sm">Weight</span>
                   <span className="text-sm font-medium">{details.weight} lbs</span>
+                </div>
+              )}
+              
+              {details.rowingMeters && (
+                <div className="flex justify-between mb-2">
+                  <span className="text-sm">Distance</span>
+                  <span className="text-sm font-medium">{details.rowingMeters} meters</span>
+                </div>
+              )}
+              
+              {details.rowingSplit && (
+                <div className="flex justify-between mb-2">
+                  <span className="text-sm">Split</span>
+                  <span className="text-sm font-medium">{details.rowingSplit} /500m</span>
                 </div>
               )}
             </>
