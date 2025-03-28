@@ -111,7 +111,7 @@ export const workouts = pgTable("workouts", {
   startTime: text("start_time").notNull(),
   endTime: text("end_time").notNull(),
   caloriesBurned: integer("calories_burned").notNull(),
-  durationMinutes: integer("duration_minutes").notNull(),
+  durationMinutes: real("duration_minutes").notNull(), // Using real to support minutes with seconds/milliseconds
   type: text("type").notNull(),
   details: json("details").notNull(), // Additional metrics like distance, pace, etc.
 });
@@ -143,7 +143,7 @@ export const dailyProgress = pgTable("daily_progress", {
   carbsConsumed: real("carbs_consumed").default(0),
   fatConsumed: real("fat_consumed").default(0),
   sugarConsumed: real("sugar_consumed").default(0),
-  workoutMinutes: integer("workout_minutes").default(0),
+  workoutMinutes: real("workout_minutes").default(0), // Using real to support minutes with seconds/milliseconds
   caloriesBurned: integer("calories_burned").default(0),
   rowingMeters: integer("rowing_meters").default(0),
 });

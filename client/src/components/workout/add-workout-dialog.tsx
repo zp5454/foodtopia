@@ -190,9 +190,14 @@ export default function AddWorkoutDialog({ open, onOpenChange, userId, date }: A
       // Ensure date is in the correct format (YYYY-MM-DD)
       const formattedDate = new Date(values.date).toISOString().split('T')[0];
       
+      // Convert floating point duration to integer for the database
+      // We'll store the precise value in the form, but send rounded integers to the server
+      const roundedDuration = Math.round(values.durationMinutes);
+      
       return await apiRequest("POST", "/api/workouts", {
         ...values,
         date: formattedDate,
+        durationMinutes: roundedDuration,
       });
     },
     onSuccess: () => {
