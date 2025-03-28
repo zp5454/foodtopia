@@ -169,13 +169,16 @@ export default function AddWorkoutDialog({ open, onOpenChange, userId, date }: A
   // Auto-calculate split or distance for rowing workouts
   useEffect(() => {
     if (workoutType === 'rowing') {
-      if (rowingMeters && durationMinutes && (!rowingSplit || form.formState.dirtyFields.details?.rowingMeters)) {
+      // Get precise duration including seconds and milliseconds
+      const durationWithPrecision = durationMinutes; // Already includes seconds and ms as decimal
+      
+      if (rowingMeters && durationWithPrecision && (!rowingSplit || form.formState.dirtyFields.details?.rowingMeters)) {
         // Calculate split from distance and duration
-        const calculatedSplit = calculateSplitFromPace(rowingMeters, durationMinutes);
+        const calculatedSplit = calculateSplitFromPace(rowingMeters, durationWithPrecision);
         form.setValue("details.rowingSplit", calculatedSplit, { shouldDirty: true });
-      } else if (rowingSplit && durationMinutes && (!rowingMeters || form.formState.dirtyFields.details?.rowingSplit)) {
+      } else if (rowingSplit && durationWithPrecision && (!rowingMeters || form.formState.dirtyFields.details?.rowingSplit)) {
         // Calculate distance from split and duration
-        const calculatedDistance = calculateDistanceFromPace(rowingSplit, durationMinutes);
+        const calculatedDistance = calculateDistanceFromPace(rowingSplit, durationWithPrecision);
         form.setValue("details.rowingMeters", calculatedDistance, { shouldDirty: true });
       }
     }
@@ -328,7 +331,7 @@ export default function AddWorkoutDialog({ open, onOpenChange, userId, date }: A
               />
             </div>
             
-            <div className="grid grid-cols-3 gap-4">
+            <div className="space-y-4">
               <FormField
                 control={form.control}
                 name="type"
@@ -359,33 +362,82 @@ export default function AddWorkoutDialog({ open, onOpenChange, userId, date }: A
                 )}
               />
               
-              <FormField
-                control={form.control}
-                name="durationMinutes"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Duration (min)</FormLabel>
-                    <FormControl>
-                      <Input type="number" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              
-              <FormField
-                control={form.control}
-                name="caloriesBurned"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Calories Burned</FormLabel>
-                    <FormControl>
-                      <Input type="number" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="durationMinutes"
+                  render={({ field }) => (
+                    <FormItem className="col-span-2">
+                      <FormLabel>Duration</FormLabel>
+                      <div className="grid grid-cols-3 gap-2">
+                        <div>
+                          <Input 
+                            type="number" 
+                            {...field} 
+                            placeholder="Min"
+                            className="text-center"
+                          />
+                          <p className="text-xs text-center mt-1">Minutes</p>
+                        </div>
+                        <div>
+                          <Input 
+                            type="number"
+                            min="0"
+                            max="59"
+                            step="1" 
+                            placeholder="Sec"
+                            className="text-center"
+                            onChange={(e) => {
+                              const seconds = parseInt(e.target.value) || 0;
+                              const currentValue = field.value || 0;
+                              const minutes = Math.floor(currentValue);
+                              const newValue = minutes + (seconds / 60);
+                              field.onChange(newValue);
+                            }}
+                            value={field.value ? Math.floor((field.value % 1) * 60) : ''}
+                          />
+                          <p className="text-xs text-center mt-1">Seconds</p>
+                        </div>
+                        <div>
+                          <Input 
+                            type="number"
+                            min="0"
+                            max="999" 
+                            step="1"
+                            placeholder="ms"
+                            className="text-center"
+                            onChange={(e) => {
+                              const ms = parseInt(e.target.value) || 0;
+                              const currentValue = field.value || 0;
+                              const minutes = Math.floor(currentValue);
+                              const seconds = Math.floor((currentValue % 1) * 60);
+                              const newValue = minutes + (seconds / 60) + (ms / 60000);
+                              field.onChange(newValue);
+                            }}
+                            value={field.value ? Math.floor(((field.value % 1) * 60 % 1) * 1000) : ''}
+                          />
+                          <p className="text-xs text-center mt-1">Millisec</p>
+                        </div>
+                      </div>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <FormField
+                  control={form.control}
+                  name="caloriesBurned"
+                  render={({ field }) => (
+                    <FormItem className="col-span-2">
+                      <FormLabel>Calories Burned</FormLabel>
+                      <FormControl>
+                        <Input type="number" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
             </div>
             
             {/* Conditional workout details based on type */}
