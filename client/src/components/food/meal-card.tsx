@@ -86,11 +86,11 @@ export default function MealCard({ meal }: MealCardProps) {
   };
   
   return (
-    <Card className="mb-3 overflow-hidden border border-gray-100 shadow-sm">
+    <Card className="mb-3 overflow-hidden border border-blue-100 shadow-sm bg-white">
       <CardContent className="p-4">
         <div className="flex justify-between items-start">
           <div className="flex items-start gap-3">
-            <div className="w-12 h-12 rounded-lg overflow-hidden bg-gray-100 flex items-center justify-center">
+            <div className="w-12 h-12 rounded-lg overflow-hidden bg-blue-50 flex items-center justify-center">
               {meal.title === "Breakfast" && (
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-orange-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
@@ -107,23 +107,23 @@ export default function MealCard({ meal }: MealCardProps) {
                 </svg>
               )}
               {meal.title !== "Breakfast" && meal.title !== "Lunch" && meal.title !== "Dinner" && (
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-purple-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
                 </svg>
               )}
             </div>
             <div>
-              <h3 className="font-medium">{meal.title}</h3>
-              <p className="text-xs text-gray-500">{meal.time}</p>
+              <h3 className="font-medium text-slate-800">{meal.title}</h3>
+              <p className="text-xs text-slate-500">{meal.time}</p>
               <div className="flex gap-2 mt-1">
-                <span className="text-xs bg-gray-100 px-2 py-0.5 rounded-full">{meal.totalCalories} cal</span>
-                <span className="text-xs bg-gray-100 px-2 py-0.5 rounded-full">{meal.totalProtein}g protein</span>
+                <span className="text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full font-medium">{meal.totalCalories} cal</span>
+                <span className="text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full font-medium">{meal.totalProtein}g protein</span>
               </div>
             </div>
           </div>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="text-gray-400">
+              <Button variant="ghost" size="icon" className="text-slate-400 hover:text-slate-600">
                 <MoreVertical className="h-5 w-5" />
               </Button>
             </DropdownMenuTrigger>
@@ -135,21 +135,21 @@ export default function MealCard({ meal }: MealCardProps) {
           </DropdownMenu>
         </div>
         
-        <div className="mt-3 pt-3 border-t border-gray-100">
+        <div className="mt-3 pt-3 border-t border-blue-100">
           <ul className="space-y-2">
             {Array.isArray(meal.items) && meal.items.map((item: any, index: number) => (
               <li key={index} className="flex justify-between text-sm">
-                <span>{item.name}</span>
-                <span className="text-gray-500">{item.calories} cal</span>
+                <span className="text-slate-800">{item.name}</span>
+                <span className="text-slate-600 font-medium">{item.calories} cal</span>
               </li>
             ))}
           </ul>
           
           {/* Rating and analysis */}
-          <div className="mt-3 pt-2 border-t border-gray-100">
+          <div className="mt-3 pt-2 border-t border-blue-100">
             <div className="flex items-center justify-between">
               <div className="flex items-center">
-                <span className="text-xs font-medium mr-2">Ingredient Quality:</span>
+                <span className="text-xs font-medium mr-2 text-slate-700">Ingredient Quality:</span>
                 <div className="flex">
                   {Array.from({ length: 4 }).map((_, i) => (
                     <span 
@@ -164,16 +164,16 @@ export default function MealCard({ meal }: MealCardProps) {
               </div>
               <span className={cn(
                 "text-xs font-medium", 
-                meal.ingredientQuality === 4 ? "text-green-500" : 
-                meal.ingredientQuality === 3 ? "text-yellow-500" : 
-                meal.ingredientQuality === 2 ? "text-orange-500" : 
-                "text-red-500"
+                meal.ingredientQuality === 4 ? "text-green-600" : 
+                meal.ingredientQuality === 3 ? "text-yellow-600" : 
+                meal.ingredientQuality === 2 ? "text-orange-600" : 
+                "text-red-600"
               )}>
                 {qualityText()}
               </span>
             </div>
             {meal.qualityNotes && (
-              <p className="text-xs text-gray-500 mt-1">{meal.qualityNotes}</p>
+              <p className="text-xs text-slate-600 mt-1">{meal.qualityNotes}</p>
             )}
           </div>
         </div>

@@ -19,7 +19,7 @@ export default function BottomNavigation({ currentPath }: BottomNavigationProps)
   ];
   
   return (
-    <nav className="fixed bottom-0 left-0 right-0 bg-background border-t border-border px-4 py-2 flex justify-between items-center max-w-md mx-auto z-10">
+    <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-blue-200 px-4 py-2 flex justify-between items-center max-w-md mx-auto z-10 shadow-lg">
       {links.map((link) => {
         const isActive = activePath === link.href;
         return (
@@ -31,12 +31,12 @@ export default function BottomNavigation({ currentPath }: BottomNavigationProps)
             <button className={cn(
                 "flex flex-col items-center justify-center w-full transition-colors",
                 isActive 
-                  ? "text-primary font-medium" 
-                  : "text-muted-foreground hover:text-foreground"
+                  ? "text-blue-500 font-medium" 
+                  : "text-slate-500 hover:text-slate-800"
               )}
             >
-              <link.icon className="h-6 w-6" />
-              <span className="text-xs mt-1">{link.label}</span>
+              <link.icon className={cn("h-6 w-6", isActive ? "fill-blue-100" : "")} />
+              <span className="text-xs mt-1 font-medium">{link.label}</span>
             </button>
           </Link>
         );
