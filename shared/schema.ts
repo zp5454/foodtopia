@@ -145,6 +145,7 @@ export const dailyProgress = pgTable("daily_progress", {
   sugarConsumed: real("sugar_consumed").default(0),
   workoutMinutes: integer("workout_minutes").default(0),
   caloriesBurned: integer("calories_burned").default(0),
+  rowingMeters: integer("rowing_meters").default(0),
 });
 
 export const insertDailyProgressSchema = createInsertSchema(dailyProgress)
@@ -158,6 +159,7 @@ export const insertDailyProgressSchema = createInsertSchema(dailyProgress)
     sugarConsumed: true,
     workoutMinutes: true,
     caloriesBurned: true,
+    rowingMeters: true,
   })
   .extend({
     // Add transform to ensure dates are properly handled
@@ -257,6 +259,9 @@ export const workoutDetailsSchema = z.object({
   sets: z.number().optional(),
   reps: z.number().optional(),
   weight: z.number().optional(),
+  // Rowing specific fields
+  rowingMeters: z.number().optional(),
+  rowingSplit: z.string().optional(), // Format: MM:SS
 });
 
 export type MealItem = z.infer<typeof mealItemSchema>;

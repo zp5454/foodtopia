@@ -115,6 +115,15 @@ export default function Progress() {
     totalCaloriesConsumed: weeklyData.reduce((acc, day) => acc + day.consumed, 0),
     totalCaloriesBurned: weeklyData.reduce((acc, day) => acc + day.burned, 0),
     totalWorkoutMinutes: weeklyData.reduce((acc, day) => acc + day.workoutMinutes, 0),
+    totalRowingMeters: weeklyData.reduce((acc, day) => {
+      const index = weeklyData.findIndex(d => d.date === day.date);
+      if (index >= 0 && index < daysInWeek.length) {
+        const dateKey = format(daysInWeek[index], "yyyy-MM-dd");
+        const progress = progressData.get(dateKey);
+        return acc + (progress?.rowingMeters || 0);
+      }
+      return acc;
+    }, 0),
     avgProtein: weeklyData.reduce((acc, day) => {
       // day.date here is already a formatted string like "Mon", "Tue", etc.
       // We need to use the same index to get the original Date object
@@ -242,6 +251,14 @@ export default function Progress() {
                     <div className="text-xs text-gray-500 mt-1">per day</div>
                   </CardContent>
                 </Card>
+                
+                <Card>
+                  <CardContent className="p-4">
+                    <div className="text-gray-500 text-sm">Rowing Distance</div>
+                    <div className="text-2xl font-bold mt-1">{weeklyStats.totalRowingMeters.toLocaleString()} m</div>
+                    <div className="text-xs text-gray-500 mt-1">total meters</div>
+                  </CardContent>
+                </Card>
               </div>
               
               <Card>
@@ -279,6 +296,39 @@ export default function Progress() {
                         <Tooltip />
                         <Legend />
                         <Bar dataKey="workoutMinutes" fill="#4F46E5" name="Workout Minutes" />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </CardContent>
+              </Card>
+              
+              <Card className="mt-4">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-lg">Weekly Rowing Distance</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="h-64 w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={weeklyData.map(day => {
+                        // Find the original date for this formatted day label
+                        const index = weeklyData.findIndex(d => d.date === day.date);
+                        let rowingMeters = 0;
+                        if (index >= 0 && index < daysInWeek.length) {
+                          const dateKey = format(daysInWeek[index], "yyyy-MM-dd");
+                          const progress = progressData.get(dateKey);
+                          rowingMeters = progress?.rowingMeters || 0;
+                        }
+                        return {
+                          ...day,
+                          rowingMeters
+                        };
+                      })}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="date" />
+                        <YAxis />
+                        <Tooltip />
+                        <Legend />
+                        <Bar dataKey="rowingMeters" fill="#10B981" name="Rowing Distance (meters)" />
                       </BarChart>
                     </ResponsiveContainer>
                   </div>

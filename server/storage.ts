@@ -6,7 +6,8 @@ import {
   workouts, type Workout, type InsertWorkout,
   dailyProgress, type DailyProgress, type InsertDailyProgress,
   foodSuggestions, type FoodSuggestion, type InsertFoodSuggestion,
-  workoutSuggestions, type WorkoutSuggestion, type InsertWorkoutSuggestion
+  workoutSuggestions, type WorkoutSuggestion, type InsertWorkoutSuggestion,
+  type WorkoutDetails
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, gte, lte } from "drizzle-orm";
@@ -332,12 +333,19 @@ export class MemStorage implements IStorage {
     const date = new Date(workout.date);
     const dailyProgress = await this.getDailyProgress(workout.userId, date);
     
+    // Extract rowing meters if this is a rowing workout
+    let rowingMeters = 0;
+    if (workout.type === 'rowing' && workout.details && typeof workout.details === 'object') {
+      rowingMeters = (workout.details as WorkoutDetails).rowingMeters || 0;
+    }
+    
     if (dailyProgress) {
       const key = `${workout.userId}-${date.toISOString().split('T')[0]}`;
       const updatedProgress: DailyProgress = {
         ...dailyProgress,
         workoutMinutes: dailyProgress.workoutMinutes + workout.durationMinutes,
         caloriesBurned: dailyProgress.caloriesBurned + workout.caloriesBurned,
+        rowingMeters: dailyProgress.rowingMeters + rowingMeters
       };
       this.dailyProgressRecords.set(key, updatedProgress);
     } else {
@@ -353,6 +361,7 @@ export class MemStorage implements IStorage {
         sugarConsumed: 0,
         workoutMinutes: workout.durationMinutes,
         caloriesBurned: workout.caloriesBurned,
+        rowingMeters: rowingMeters
       };
       const key = `${workout.userId}-${date.toISOString().split('T')[0]}`;
       this.dailyProgressRecords.set(key, newProgress);
@@ -976,10 +985,20 @@ export class DatabaseStorage implements IStorage {
       // Calculate total workout stats
       let totalMinutes = 0;
       let totalCaloriesBurned = 0;
+      let totalRowingMeters = 0;
       
+      // Loop through each workout and extract metrics
       for (const w of workouts) {
         totalMinutes += w.durationMinutes;
         totalCaloriesBurned += w.caloriesBurned;
+        
+        // Add rowing meters if this is a rowing workout
+        if (w.type === 'rowing' && w.details && typeof w.details === 'object') {
+          const details = w.details as Record<string, any>;
+          if (details.rowingMeters) {
+            totalRowingMeters += Number(details.rowingMeters) || 0;
+          }
+        }
       }
       
       // Update progress
@@ -987,10 +1006,20 @@ export class DatabaseStorage implements IStorage {
         .update(dailyProgress)
         .set({
           workoutMinutes: totalMinutes,
-          caloriesBurned: totalCaloriesBurned
+          caloriesBurned: totalCaloriesBurned,
+          rowingMeters: totalRowingMeters
         })
         .where(eq(dailyProgress.id, progress.id));
     } else {
+      // Extract rowing meters if this is a rowing workout
+      let rowingMeters = 0;
+      if (workout.type === 'rowing' && workout.details && typeof workout.details === 'object') {
+        const details = workout.details as Record<string, any>;
+        if (details.rowingMeters) {
+          rowingMeters = Number(details.rowingMeters) || 0;
+        }
+      }
+      
       // Create new progress entry
       await db.insert(dailyProgress).values({
         userId: workout.userId,
@@ -1001,7 +1030,8 @@ export class DatabaseStorage implements IStorage {
         fatConsumed: 0,
         sugarConsumed: 0,
         workoutMinutes: workout.durationMinutes,
-        caloriesBurned: workout.caloriesBurned
+        caloriesBurned: workout.caloriesBurned,
+        rowingMeters: rowingMeters
       });
     }
   }
@@ -1362,7 +1392,8 @@ export async function initDatabase() {
       fatConsumed: 60,
       sugarConsumed: 45,
       workoutMinutes: 75,
-      caloriesBurned: 650
+      caloriesBurned: 650,
+      rowingMeters: 0
     });
   }
 }

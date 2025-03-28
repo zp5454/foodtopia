@@ -46,6 +46,8 @@ const workoutDetailsSchema = z.object({
   sets: z.coerce.number().min(0).optional(),
   reps: z.coerce.number().min(0).optional(),
   weight: z.coerce.number().min(0).optional(),
+  rowingMeters: z.coerce.number().min(0).optional(),
+  rowingSplit: z.string().optional(),
 });
 
 const workoutFormSchema = z.object({
@@ -97,6 +99,8 @@ export default function AddWorkoutDialog({ open, onOpenChange, userId, date }: A
         sets: undefined,
         reps: undefined,
         weight: undefined,
+        rowingMeters: undefined,
+        rowingSplit: undefined,
       },
     },
   });
@@ -138,6 +142,8 @@ export default function AddWorkoutDialog({ open, onOpenChange, userId, date }: A
           sets: undefined,
           reps: undefined,
           weight: undefined,
+          rowingMeters: undefined,
+          rowingSplit: undefined,
         },
       });
       
@@ -271,6 +277,7 @@ export default function AddWorkoutDialog({ open, onOpenChange, userId, date }: A
                           <SelectItem value="strength">Strength</SelectItem>
                           <SelectItem value="flexibility">Flexibility</SelectItem>
                           <SelectItem value="hiit">HIIT</SelectItem>
+                          <SelectItem value="rowing">Rowing</SelectItem>
                         </SelectGroup>
                       </SelectContent>
                     </Select>
@@ -406,6 +413,52 @@ export default function AddWorkoutDialog({ open, onOpenChange, userId, date }: A
               
               {workoutType === 'flexibility' && (
                 <div>
+                  <FormField
+                    control={form.control}
+                    name="details.heartRate"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Avg Heart Rate (bpm)</FormLabel>
+                        <FormControl>
+                          <Input type="number" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              )}
+              
+              {workoutType === 'rowing' && (
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="details.rowingMeters"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Distance (meters)</FormLabel>
+                        <FormControl>
+                          <Input type="number" step="100" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={form.control}
+                    name="details.rowingSplit"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Average Split (min:sec)</FormLabel>
+                        <FormControl>
+                          <Input placeholder="E.g., 2:05" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
                   <FormField
                     control={form.control}
                     name="details.heartRate"
