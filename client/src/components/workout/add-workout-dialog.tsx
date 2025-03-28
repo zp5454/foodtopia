@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
 import { apiRequest } from "@/lib/queryClient";
@@ -37,6 +37,61 @@ import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
 import { format } from "date-fns";
 import { type Exercise } from "@shared/schema";
+
+// Utility functions for rowing calculations
+const splitToSeconds = (splitTime: string): number => {
+  if (!splitTime) return 0;
+  
+  // Handle various formats: mm:ss.ms, mm:ss, m:ss.ms, m:ss
+  const parts = splitTime.split(':');
+  if (parts.length !== 2) return 0;
+  
+  const minutes = parseFloat(parts[0]);
+  const secondsPart = parts[1].split('.');
+  const seconds = parseFloat(secondsPart[0]);
+  const milliseconds = secondsPart.length > 1 ? parseFloat('0.' + secondsPart[1]) : 0;
+  
+  return minutes * 60 + seconds + milliseconds;
+};
+
+const secondsToSplit = (seconds: number): string => {
+  if (!seconds || seconds <= 0) return '';
+  
+  const minutes = Math.floor(seconds / 60);
+  const remainingSeconds = seconds % 60;
+  
+  // Format with two decimal places for fraction of seconds
+  return `${minutes}:${remainingSeconds < 10 ? '0' : ''}${remainingSeconds.toFixed(2)}`;
+};
+
+// Calculate pace from distance and time
+const calculateSplitFromPace = (distanceMeters: number, durationMinutes: number): string => {
+  if (!distanceMeters || distanceMeters <= 0 || !durationMinutes || durationMinutes <= 0) {
+    return '';
+  }
+  
+  // Standard calculation: pace per 500m
+  const totalSeconds = durationMinutes * 60;
+  const paceSeconds = (totalSeconds / distanceMeters) * 500;
+  
+  return secondsToSplit(paceSeconds);
+};
+
+// Calculate distance from pace and time
+const calculateDistanceFromPace = (splitTime: string, durationMinutes: number): number => {
+  if (!splitTime || !durationMinutes || durationMinutes <= 0) {
+    return 0;
+  }
+  
+  const splitSeconds = splitToSeconds(splitTime);
+  if (splitSeconds <= 0) return 0;
+  
+  // Distance calculation based on pace per 500m
+  const totalSeconds = durationMinutes * 60;
+  const distanceMeters = (totalSeconds / splitSeconds) * 500;
+  
+  return Math.round(distanceMeters);
+};
 
 // Form schema
 const workoutDetailsSchema = z.object({
@@ -105,8 +160,26 @@ export default function AddWorkoutDialog({ open, onOpenChange, userId, date }: A
     },
   });
   
-  // Watch the workout type to show relevant detail fields
+  // Watch the workout type and fields for auto-calculations
   const workoutType = form.watch("type");
+  const durationMinutes = form.watch("durationMinutes");
+  const rowingMeters = form.watch("details.rowingMeters");
+  const rowingSplit = form.watch("details.rowingSplit");
+  
+  // Auto-calculate split or distance for rowing workouts
+  useEffect(() => {
+    if (workoutType === 'rowing') {
+      if (rowingMeters && durationMinutes && (!rowingSplit || form.formState.dirtyFields.details?.rowingMeters)) {
+        // Calculate split from distance and duration
+        const calculatedSplit = calculateSplitFromPace(rowingMeters, durationMinutes);
+        form.setValue("details.rowingSplit", calculatedSplit, { shouldDirty: true });
+      } else if (rowingSplit && durationMinutes && (!rowingMeters || form.formState.dirtyFields.details?.rowingSplit)) {
+        // Calculate distance from split and duration
+        const calculatedDistance = calculateDistanceFromPace(rowingSplit, durationMinutes);
+        form.setValue("details.rowingMeters", calculatedDistance, { shouldDirty: true });
+      }
+    }
+  }, [workoutType, durationMinutes, rowingMeters, rowingSplit, form]);
   
   // Add workout mutation
   const addWorkoutMutation = useMutation({
@@ -430,34 +503,42 @@ export default function AddWorkoutDialog({ open, onOpenChange, userId, date }: A
               )}
               
               {workoutType === 'rowing' && (
-                <div className="grid grid-cols-2 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="details.rowingMeters"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Distance (meters)</FormLabel>
-                        <FormControl>
-                          <Input type="number" step="100" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  
-                  <FormField
-                    control={form.control}
-                    name="details.rowingSplit"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Average Split (min:sec)</FormLabel>
-                        <FormControl>
-                          <Input placeholder="E.g., 2:05" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                <div className="space-y-4">
+                  <div className="flex justify-between gap-4">
+                    <FormField
+                      control={form.control}
+                      name="details.rowingMeters"
+                      render={({ field }) => (
+                        <FormItem className="flex-1">
+                          <FormLabel>Distance (meters)</FormLabel>
+                          <FormControl>
+                            <Input type="number" step="1" {...field} />
+                          </FormControl>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Enter distance or let it auto-calculate from split
+                          </p>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <FormField
+                      control={form.control}
+                      name="details.rowingSplit"
+                      render={({ field }) => (
+                        <FormItem className="flex-1">
+                          <FormLabel>Average Split (min:sec.ms)</FormLabel>
+                          <FormControl>
+                            <Input placeholder="E.g., 2:05.3" {...field} />
+                          </FormControl>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Format: 2:05.3 or 1:59.81
+                          </p>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
                   
                   <FormField
                     control={form.control}
