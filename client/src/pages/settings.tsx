@@ -35,7 +35,6 @@ const nutritionGoalsSchema = z.object({
 });
 
 export default function Settings() {
-  const [darkMode, setDarkMode] = useState(false);
   const [notifications, setNotifications] = useState(true);
   
   const { toast } = useToast();
@@ -114,19 +113,6 @@ export default function Settings() {
               <CardDescription>Manage your account settings</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="font-medium">Dark Mode</h3>
-                  <p className="text-sm text-gray-500">Toggle dark mode on or off</p>
-                </div>
-                <Switch 
-                  checked={darkMode} 
-                  onCheckedChange={setDarkMode} 
-                />
-              </div>
-              
-              <Separator />
-              
               <div className="flex items-center justify-between">
                 <div>
                   <h3 className="font-medium">Notifications</h3>
