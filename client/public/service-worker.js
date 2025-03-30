@@ -1,20 +1,29 @@
 // Service Worker for Foodtopia PWA
-const CACHE_NAME = 'foodtopia-v1';
+const CACHE_NAME = 'foodtopia-v2';
 
-// Assets to cache
+// Get the base path from the service worker location
+const getBasePath = () => {
+  const scope = self.registration.scope;
+  return new URL(scope).pathname;
+};
+
+// Assets to cache - will be prefixed with the base path at runtime
 const urlsToCache = [
-  '/',
-  '/index.html',
-  '/manifest.json',
-  '/icons/icon-192.png',
-  '/icons/icon-512.png'
+  '', // Root of the app
+  'index.html',
+  'manifest.json',
+  'icons/icon-192.png',
+  'icons/icon-512.png'
 ];
 
 // Install the service worker and cache assets
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(urlsToCache);
+      const basePath = getBasePath();
+      // Add base path to all URLs
+      const urlsToFetch = urlsToCache.map(url => basePath + url);
+      return cache.addAll(urlsToFetch);
     })
   );
 });
